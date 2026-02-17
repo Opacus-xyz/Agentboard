@@ -1,128 +1,124 @@
 # Opacus Agentboard
 
-Production-ready web dashboard for creating, managing, and observing autonomous agents on Opacus.
+Production dashboard for creating, managing, and operating autonomous agents on Opacus.
 
-## What this repository contains
+## Live Links
 
-- `agentboard.html` — Single-file dashboard UI (auth, agent lifecycle, billing, API key management)
-- `QUICKSTART.md` — Fast setup and usage guide
+- App: https://opacus.xyz/agentboard.html
+- Current API tunnel: https://6995-78-186-104-224.ngrok-free.app
 
-## Live deployment
+## Repository Structure
 
-- Production: https://opacus.xyz/agentboard.html
-- API (current tunnel): https://6995-78-186-104-224.ngrok-free.app
+- agentboard.html — Single-file production dashboard UI
+- QUICKSTART.md — Fast setup and first-run checks
+- ROADMAP.md — Planned milestones and delivery status
+- CHANGELOG.md — Release history and notable updates
+- CONTRIBUTING.md — Collaboration and PR expectations
 
-## Core capabilities
+## Product Scope
 
-### 1) Authentication
+### Authentication
 
-- Google OAuth (backend code exchange)
-- GitHub OAuth (backend code exchange)
-- MetaMask login with **mandatory signature** (`personal_sign`)
-- Automatic fallback to email login when OAuth is not configured
+- Google OAuth code exchange flow
+- GitHub OAuth code exchange flow
+- MetaMask login with mandatory personal_sign signature
+- Automatic fallback flow when OAuth providers are not configured
 
-### 2) Agent lifecycle
+### Agent Operations
 
-- Create agent (`POST /api/agents`)
-- List agents (`GET /api/agents`)
-- View runtime/metrics (`GET /api/agents/:sessionId/runtime`)
-- Delete agent (`DELETE /api/agents/:sessionId`)
+- Create agents
+- List and inspect runtime status
+- Delete agents
+- Observe platform and activity metrics
 
-### 3) Billing / Payments
+### Payments and Billing
 
-- Wallet connect + network checks
-- On-chain balance visibility
-- Payment flow helpers (lock/release UI actions)
-- Settlement and billing table visualization
+- Wallet connection and network checks
+- On-chain USDC balance visibility
+- Payment lock/release helper flows
+- Settlement-oriented billing table
 
-### 4) Developer tools in UI
+### Developer Experience
 
-- API key generation + local persistence
-- Environment switch (sandbox/production)
-- Activity feed and operational status indicators
+- API key generation and local persistence
+- Environment switching and diagnostics
+- Operational status and health indicators
 
-## Runtime architecture
+## API Dependencies
 
-Agentboard is a browser UI that talks to Agent Kernel HTTP API:
+Agentboard expects these backend endpoints:
 
-- Frontend: static HTML/CSS/JS (`agentboard.html`)
-- Backend: Agent Kernel (`/api/*`, `/auth/*`)
-- Blockchain integrations: MetaMask + ethers.js
+- GET /health
+- GET /auth/config
+- POST /auth/google/token
+- POST /auth/github/token
+- POST /api/agents
+- GET /api/agents
+- GET /api/agents/:sessionId
+- DELETE /api/agents/:sessionId
 
-## Important behavior notes
+## Required Backend Environment
 
-- In production, Agentboard uses the configured production API base URL.
-- MetaMask login is non-persistent by design and requires signature each time.
-- OAuth errors are surfaced toasts-first and fall back gracefully when needed.
+- GOOGLE_OAUTH_CLIENT_ID
+- GOOGLE_OAUTH_CLIENT_SECRET
+- GITHUB_OAUTH_CLIENT_ID
+- GITHUB_OAUTH_CLIENT_SECRET
+- FRONTEND_URL
 
-## Environment expectations (backend)
+## Local Run
 
-Agentboard depends on these backend endpoints:
+1) Start backend
 
-- `GET /health`
-- `GET /auth/config`
-- `POST /auth/google/token`
-- `POST /auth/github/token`
-- `POST /api/agents`
-- `GET /api/agents`
-- `GET /api/agents/:sessionId`
-- `DELETE /api/agents/:sessionId`
+- cd agent-kernel
+- npm install
+- npm run build
+- node dist/api-server.js
 
-OAuth backend env variables expected:
+2) Start static frontend
 
-- `GOOGLE_OAUTH_CLIENT_ID`
-- `GOOGLE_OAUTH_CLIENT_SECRET`
-- `GITHUB_OAUTH_CLIENT_ID`
-- `GITHUB_OAUTH_CLIENT_SECRET`
-- `FRONTEND_URL`
+- cd website
+- npx serve . -l 8080
 
-## Local development
+3) Open
 
-```bash
-# serve static UI
-cd website
-npx serve . -l 8080
+- http://localhost:8080/agentboard.html
 
-# run backend (agent-kernel)
-cd ../agent-kernel
-npm install
-npm run build
-node dist/api-server.js
-```
+## Deployment Notes
 
-Then open:
+- Frontend is deployed on Vercel (opacus.xyz)
+- Current backend exposure is ngrok-based
+- Stable production should use fixed domain API hosting
 
-- `http://localhost:8080/agentboard.html`
+## Security Notes
 
-## Deployment notes
-
-- Vercel deploy is used for `opacus.xyz`.
-- API currently exposed via ngrok tunnel in this setup.
-- For stable production API, migrate from ngrok free tunnel to fixed-host backend.
-
-## Security notes
-
-- Never commit private keys or OAuth secrets.
-- Keep `.env.mainnet` private and machine-local.
-- Browser wallet signatures are user-mediated and cannot be automated server-side.
+- Never commit private keys, OAuth secrets, or wallet seed material
+- Keep mainnet env files machine-local and excluded from source control
+- Browser signatures are user-side approvals and are not server-automatable
 
 ## Troubleshooting
 
-### OAuth `invalid_client`
+### OAuth invalid_client
 
-- Verify OAuth client IDs/secrets in backend env
-- Verify redirect URIs and origins in Google/GitHub app settings
-- Confirm `/auth/config` returns non-empty client IDs
+- Confirm provider app client id/secret
+- Confirm redirect URI and origin registration
+- Confirm /auth/config returns non-empty provider ids
 
-### Stuck on "Please wait"
+### Login stuck on loading
 
-- Fixed in current version by deterministic modal lifecycle cleanup
-- If browser cache is stale, hard refresh (`Cmd+Shift+R`)
+- Fixed in current implementation via deterministic modal cleanup
+- Hard refresh if stale browser cache is suspected
 
-### Payment endpoint works but escrow lock fails
+### Payment lock issues
 
-- Usually wrong escrow contract for active chain
-- Validate chain ID and contract deployment address pair
+- Usually contract/chain mismatch
+- Verify escrow address matches active chain deployment
+
+## Progress Visibility
+
+Project progress is maintained in:
+
+- ROADMAP.md
+- CHANGELOG.md
 
 ## License
 
