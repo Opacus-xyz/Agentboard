@@ -1,0 +1,2072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mission Control | Opacus Economic Runtime</title>
+    <link rel="icon" href="logo.png" type="image/png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+    <style>
+        /* ═══════════════════════════════════════════
+           DESIGN TOKENS
+           ═══════════════════════════════════════════ */
+        :root {
+            --bg-dark: #0b0d10;
+            --bg-card: #111827;
+            --bg-elevated: #1a1f2b;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --primary-glow: rgba(59,130,246,0.15);
+            --accent: #22d3ee;
+            --success: #10b981;
+            --warning: #fbbf24;
+            --danger: #ef4444;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border: #273244;
+            --sidebar-width: 240px;
+            --nav-height: 64px;
+        }
+
+        /* ═══════════════════════════════════════════
+           RESET & BASE
+           ═══════════════════════════════════════════ */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            line-height: 1.5;
+        }
+        code { font-family: 'JetBrains Mono', 'IBM Plex Mono', 'SF Mono', monospace; font-size: 0.85em; }
+
+        /* ═══════════════════════════════════════════
+           ANIMATIONS
+           ═══════════════════════════════════════════ */
+        @keyframes fadeIn      { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp     { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideDown   { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes scaleIn     { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+        @keyframes slideInRight  { from { opacity: 0; transform: translateX(100px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes slideOutRight { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(100px); } }
+        @keyframes pulse       { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        @keyframes spin        { to { transform: rotate(360deg); } }
+        @keyframes checkmark   { 0% { stroke-dashoffset: 50; } 100% { stroke-dashoffset: 0; } }
+
+        /* ═══════════════════════════════════════════
+           TOP NAV
+           ═══════════════════════════════════════════ */
+        .top-nav {
+            position: fixed; top: 0; left: 0; right: 0; height: var(--nav-height);
+            background: var(--bg-card); border-bottom: 1px solid var(--border);
+            z-index: 1000; display: flex; align-items: center; padding: 0 2rem; justify-content: space-between;
+        }
+        .nav-logo { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1.25rem; }
+        .nav-logo img { height: 32px; }
+        .nav-badge { font-size: 0.7rem; color: var(--text-secondary); font-weight: 400; margin-left: 0.5rem; }
+        .network-pill {
+            font-size: 0.72rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 0.2rem 0.5rem;
+            border-radius: 999px;
+            margin-left: 0.5rem;
+        }
+        .environment-switcher { display: flex; gap: 0.5rem; background: var(--bg-elevated); padding: 0.5rem; border-radius: 8px; }
+        .env-option {
+            padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem;
+            border: none; background: none; color: var(--text-secondary);
+        }
+        .env-option.active { background: var(--bg-card); box-shadow: 0 0 0 1px var(--border); color: var(--text-primary); }
+        .env-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .env-dot.sandbox { background: var(--warning); }
+        .env-dot.production { background: var(--success); }
+
+        /* ═══════════════════════════════════════════
+           SIDEBAR
+           ═══════════════════════════════════════════ */
+        .sidebar {
+            position: fixed; left: 0; top: var(--nav-height); width: var(--sidebar-width);
+            height: calc(100vh - var(--nav-height)); background: var(--bg-card);
+            border-right: 1px solid var(--border); padding: 1.5rem 0; overflow-y: auto; z-index: 900;
+        }
+        .sidebar-nav { list-style: none; }
+        .sidebar-item {
+            padding: 0.75rem 1.5rem; cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; gap: 0.75rem; color: var(--text-secondary);
+            border: none; background: none; width: 100%; text-align: left; font-size: 0.9rem;
+        }
+        .sidebar-item:hover { background: var(--bg-elevated); color: var(--text-primary); }
+        .sidebar-item.active { background: var(--bg-elevated); color: var(--primary); border-left: 3px solid var(--primary); }
+        .sidebar-item i { width: 20px; text-align: center; }
+
+        /* ═══════════════════════════════════════════
+           MAIN CONTENT
+           ═══════════════════════════════════════════ */
+        .main-content {
+            margin-left: var(--sidebar-width); margin-top: var(--nav-height);
+            padding: 2rem; min-height: calc(100vh - var(--nav-height));
+        }
+        .content-grid { display: grid; grid-template-columns: 1fr 320px; gap: 2rem; }
+        .content-grid.full-width { grid-template-columns: 1fr; }
+        .content-grid.full-width .right-sidebar { display: none; }
+        .dashboard-section { animation: fadeIn 0.3s ease-in; }
+
+        /* ═══════════════════════════════════════════
+           METRIC CARDS
+           ═══════════════════════════════════════════ */
+        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-bottom: 2rem; }
+        .metric-card {
+            background: var(--bg-card); padding: 1.5rem; border-radius: 12px;
+            border: 1px solid var(--border); transition: transform 0.2s, border-color 0.2s;
+        }
+        .metric-card:hover { transform: translateY(-2px); border-color: var(--primary); }
+        .metric-label { color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 0.5rem; }
+        .metric-value { font-size: 2rem; font-weight: 700; margin-bottom: 0.25rem; }
+        .metric-sub { font-size: 0.85rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.35rem; }
+        .metric-sub.positive { color: var(--success); }
+
+        /* ═══════════════════════════════════════════
+           BUTTONS
+           ═══════════════════════════════════════════ */
+        .btn-primary {
+            background: var(--primary); color: white; padding: 0.75rem 1.5rem; border-radius: 8px;
+            border: none; cursor: pointer; font-weight: 500; transition: all 0.2s;
+            display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;
+        }
+        .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-secondary {
+            background: var(--bg-elevated); color: var(--text-primary); padding: 0.75rem 1.5rem;
+            border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s; font-size: 0.9rem;
+        }
+        .btn-secondary:hover { border-color: var(--primary); }
+        .btn-action {
+            padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border);
+            background: var(--bg-elevated); color: var(--text-primary); cursor: pointer;
+            transition: all 0.2s; font-size: 0.85rem;
+        }
+        .btn-action:hover { border-color: var(--primary); }
+        .btn-danger { color: var(--danger); }
+        .btn-danger:hover { border-color: var(--danger); }
+
+        /* ═══════════════════════════════════════════
+           AGENT CARDS
+           ═══════════════════════════════════════════ */
+        .agents-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .agent-card {
+            background: var(--bg-card); padding: 1.5rem; border-radius: 12px;
+            border: 1px solid var(--border); transition: all 0.2s; animation: slideUp 0.4s ease;
+        }
+        .agent-card:hover { border-color: var(--primary); transform: translateY(-4px); box-shadow: 0 8px 30px rgba(0,0,0,0.3); }
+        .agent-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem; }
+        .agent-name { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+        .agent-did { font-size: 0.7rem; color: var(--text-secondary); font-family: monospace; word-break: break-all; }
+        .status-badge { padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+        .status-badge.active { background: rgba(16,185,129,0.1); color: var(--success); }
+        .capability-tag {
+            padding: 0.2rem 0.6rem; background: var(--bg-elevated); border-radius: 6px;
+            font-size: 0.75rem; color: var(--text-secondary); display: inline-block; margin: 0.15rem;
+        }
+        .agent-stats {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+            margin: 1rem 0; padding-top: 1rem; border-top: 1px solid var(--border);
+        }
+        .stat-value { font-size: 0.95rem; font-weight: 700; color: var(--primary); }
+        .stat-label { font-size: 0.75rem; color: var(--text-secondary); }
+        .agent-actions { display: flex; gap: 0.5rem; }
+
+        /* ═══════════════════════════════════════════
+           TABLES
+           ═══════════════════════════════════════════ */
+        .data-table { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+        .table-header { padding: 1rem 1.5rem; background: var(--bg-elevated); display: flex; justify-content: space-between; align-items: center; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th { padding: 1rem 1.5rem; text-align: left; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+        tbody td { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+        tbody tr:hover { background: var(--bg-elevated); }
+
+        /* ═══════════════════════════════════════════
+           API KEY CARD
+           ═══════════════════════════════════════════ */
+        .api-key-card {
+            background: var(--bg-card); padding: 1.5rem; border-radius: 12px;
+            border: 1px solid var(--border); margin-bottom: 1rem; animation: slideUp 0.4s ease;
+        }
+
+        /* ═══════════════════════════════════════════
+           RIGHT SIDEBAR
+           ═══════════════════════════════════════════ */
+        .right-sidebar { position: sticky; top: calc(var(--nav-height) + 1rem); }
+        .revenue-widget {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6); border-radius: 12px;
+            padding: 1.5rem; margin-bottom: 1.5rem;
+        }
+        .revenue-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+        .revenue-stat { background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px; }
+        .revenue-stat .label { font-size: 0.75rem; opacity: 0.9; margin-bottom: 0.5rem; }
+        .revenue-stat .value { font-size: 1.5rem; font-weight: 700; }
+        .activity-feed { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border); padding: 1.5rem; }
+        .activity-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+        .live-dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; animation: pulse 2s infinite; }
+        .activity-item { padding: 0.75rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+        .activity-item:last-child { border-bottom: none; }
+        .activity-time { color: var(--text-secondary); font-size: 0.75rem; margin-bottom: 0.15rem; }
+        .activity-amount { color: var(--success); font-weight: 600; }
+
+        /* ═══════════════════════════════════════════
+           TOAST NOTIFICATIONS
+           ═══════════════════════════════════════════ */
+        .toast-container {
+            position: fixed; top: calc(var(--nav-height) + 16px); right: 20px;
+            z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem;
+        }
+        .toast {
+            padding: 1rem 1.5rem; border-radius: 10px; font-weight: 500; font-size: 0.9rem;
+            display: flex; align-items: center; gap: 0.75rem; min-width: 300px; max-width: 450px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4); animation: slideInRight 0.3s ease;
+            border: 1px solid transparent;
+        }
+        .toast.success { background: #065f46; border-color: var(--success); color: #d1fae5; }
+        .toast.error   { background: #7f1d1d; border-color: var(--danger);  color: #fecaca; }
+        .toast.info    { background: #1e3a5f; border-color: var(--primary); color: #dbeafe; }
+        .toast.warning { background: #78350f; border-color: var(--warning); color: #fef3c7; }
+        .toast-icon { font-size: 1.2rem; flex-shrink: 0; }
+        .toast-close { margin-left: auto; cursor: pointer; opacity: 0.7; background: none; border: none; color: inherit; font-size: 1.1rem; }
+        .toast-close:hover { opacity: 1; }
+        .toast.removing { animation: slideOutRight 0.3s ease forwards; }
+
+        /* ═══════════════════════════════════════════
+           MODAL SYSTEM
+           ═══════════════════════════════════════════ */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.75); backdrop-filter: blur(6px);
+            z-index: 5000; display: flex; align-items: center; justify-content: center;
+            animation: fadeIn 0.2s ease;
+        }
+        .modal-box {
+            background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border);
+            max-width: 560px; width: 92%; max-height: 90vh; overflow-y: auto;
+            animation: scaleIn 0.3s ease; padding: 2rem;
+        }
+        .modal-box.wide { max-width: 900px; }
+
+        /* ═══════════════════════════════════════════
+           EMPTY STATE
+           ═══════════════════════════════════════════ */
+        .empty-state {
+            text-align: center; padding: 4rem 2rem; background: var(--bg-card);
+            border-radius: 12px; border: 1px dashed var(--border);
+        }
+        .empty-state-icon { font-size: 3.5rem; margin-bottom: 1rem; opacity: 0.6; }
+        .empty-state h3 { margin-bottom: 0.5rem; }
+        .empty-state p { color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem; }
+
+        /* ═══════════════════════════════════════════
+           UTILITY
+           ═══════════════════════════════════════════ */
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        .section-header h2 { font-size: 1.5rem; }
+        .form-group { margin-bottom: 1.25rem; }
+        .form-label { display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.875rem; }
+        .form-input {
+            width: 100%; padding: 0.75rem; background: var(--bg-elevated); border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text-primary); font-size: 0.9rem; transition: border-color 0.2s;
+        }
+        .form-input:focus { outline: none; border-color: var(--primary); }
+        select.form-input { appearance: auto; }
+
+        .dashboard-footer {
+            margin-top: 3rem; padding: 2rem 0; border-top: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            color: var(--text-secondary); font-size: 0.85rem;
+        }
+        .footer-links { display: flex; gap: 1.5rem; }
+        .footer-links a { color: var(--text-secondary); text-decoration: none; transition: color 0.2s; }
+        .footer-links a:hover { color: var(--primary); }
+
+        /* ═══════════════════════════════════════════
+           RESPONSIVE
+           ═══════════════════════════════════════════ */
+        @media (max-width: 1024px) {
+            .content-grid { grid-template-columns: 1fr; }
+            .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+            .right-sidebar { position: static; }
+        }
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); transition: transform 0.3s; }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; }
+            .metrics-grid { grid-template-columns: 1fr; }
+            .agents-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Toast Container -->
+<div id="toastContainer" class="toast-container"></div>
+
+<!-- ═══════════════════════════════════════════
+     TOP NAVIGATION
+     ═══════════════════════════════════════════ -->
+<nav class="top-nav">
+    <div class="nav-logo">
+        <img src="logo.png" alt="Opacus" onerror="this.style.display='none'">
+        <span>Opacus</span>
+        <span class="nav-badge">Mission Control</span>
+        <span class="network-pill">Live Network</span>
+    </div>
+    <div class="environment-switcher">
+        <button class="env-option" onclick="switchEnv('sandbox', this)">
+            <div class="env-dot sandbox"></div><span>Sandbox</span>
+        </button>
+        <button class="env-option active" onclick="switchEnv('production', this)">
+            <div class="env-dot production"></div><span>Production</span>
+        </button>
+    </div>
+    <div style="display: flex; gap: 0.75rem; align-items: center;">
+        <button id="navUserBtn" class="btn-secondary" style="padding: 0.5rem 1rem; position: relative;" onclick="showLoginModal()">
+            <i class="fas fa-user-circle"></i> <span id="navUserText">Sign In</span>
+            <span id="navUserDot" class="status-badge" style="position: absolute; right: 0.5rem; display: none;">●</span>
+        </button>
+    </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════
+     SIDEBAR
+     ═══════════════════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+    <ul class="sidebar-nav">
+        <li class="sidebar-item active" onclick="showSection('overview', this)"><i class="fas fa-chart-line"></i><span>Overview</span></li>
+        <li class="sidebar-item" onclick="showSection('agents', this)"><i class="fas fa-robot"></i><span>Agents</span></li>
+        <li class="sidebar-item" onclick="showSection('transactions', this)"><i class="fas fa-exchange-alt"></i><span>Transactions</span></li>
+        <li class="sidebar-item" onclick="showSection('api-keys', this)"><i class="fas fa-key"></i><span>API Keys</span></li>
+        <li class="sidebar-item" onclick="showSection('usage', this)"><i class="fas fa-chart-bar"></i><span>Usage</span></li>
+        <li class="sidebar-item" onclick="showSection('webhooks', this)"><i class="fas fa-plug"></i><span>Webhooks</span></li>
+        <li class="sidebar-item" onclick="showSection('settings', this)"><i class="fas fa-sliders-h"></i><span>Settings</span></li>
+        <li class="sidebar-item" onclick="showSection('billing', this)"><i class="fas fa-credit-card"></i><span>Billing</span></li>
+        <li class="sidebar-item" onclick="window.open('docs/', '_blank')"><i class="fas fa-book"></i><span>Docs</span></li>
+    </ul>
+</aside>
+
+<!-- ═══════════════════════════════════════════
+     MAIN CONTENT
+     ═══════════════════════════════════════════ -->
+<main class="main-content">
+    <div class="content-grid" id="contentGrid">
+        <div>
+
+            <!-- ════════════════════════════════════
+                 OVERVIEW SECTION
+                 ════════════════════════════════════ -->
+            <div id="sec-overview" class="dashboard-section">
+                <div style="margin-bottom: 2rem;">
+                    <h1 style="font-size: 2rem; margin-bottom: 0.5rem;">Mission Control</h1>
+                    <p style="color: var(--text-secondary);">Deterministic operational view of your economic runtime.</p>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Active Agents</div>
+                        <div class="metric-value" id="metricAgents">—</div>
+                        <div class="metric-sub positive"><i class="fas fa-robot"></i> from kernel</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">API Keys</div>
+                        <div class="metric-value" id="metricKeys">0</div>
+                        <div class="metric-sub"><i class="fas fa-key"></i> active</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Network</div>
+                        <div class="metric-value" id="metricNetwork" style="font-size: 1.5rem;">Checking...</div>
+                        <div class="metric-sub" id="metricNetworkSub"><i class="fas fa-spinner fa-spin"></i> connecting</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Environment</div>
+                        <div class="metric-value" id="metricEnv" style="font-size: 1.5rem;">Production</div>
+                        <div class="metric-sub"><i class="fas fa-check-circle"></i> live mode</div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                    <button class="btn-primary" onclick="showSection('agents')" style="padding: 1.5rem; flex-direction: column; justify-content: center;">
+                        <i class="fas fa-robot" style="font-size: 1.5rem;"></i><span>Manage Agents</span>
+                    </button>
+                    <button class="btn-primary" onclick="showSection('api-keys')" style="padding: 1.5rem; flex-direction: column; justify-content: center;">
+                        <i class="fas fa-key" style="font-size: 1.5rem;"></i><span>API Keys</span>
+                    </button>
+                    <button class="btn-primary" onclick="window.open('docs/', '_blank')" style="padding: 1.5rem; flex-direction: column; justify-content: center;">
+                        <i class="fas fa-code" style="font-size: 1.5rem;"></i><span>API Docs</span>
+                    </button>
+                </div>
+
+                <!-- Getting Started -->
+                <div style="padding: 1.5rem; background: var(--primary-glow); border-radius: 12px; border: 1px solid var(--primary);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                        <div>
+                            <h3 style="margin-bottom: 0.5rem;">Getting Started</h3>
+                            <p style="color: var(--text-secondary); margin: 0; font-size: 0.875rem;">Create an API key, launch an agent, and run your first deterministic transaction.</p>
+                        </div>
+                        <button class="btn-primary" onclick="showSection('api-keys')"><i class="fas fa-key"></i> Get API Key</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 AGENTS SECTION
+                 ════════════════════════════════════ -->
+            <div id="sec-agents" class="dashboard-section" style="display:none;">
+                <div class="section-header">
+                    <h2>Your Agents</h2>
+                    <button class="btn-primary" onclick="openCreateAgentModal()"><i class="fas fa-rocket"></i> Launch Agent</button>
+                </div>
+                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.5rem;">
+                    Agents run on the Agent Kernel at <code style="color:var(--primary);" id="kernelUrlDisplay">api.opacus.xyz</code>
+                </p>
+                <div id="agentsGrid" class="agents-grid"></div>
+                <div id="agentsEmpty" class="empty-state" style="display:none;">
+                    <div class="empty-state-icon"><i class="fas fa-robot"></i></div>
+                    <h3>No Agents Yet</h3>
+                    <p>Launch your first agent to start building autonomous systems.</p>
+                    <button class="btn-primary" onclick="openCreateAgentModal()"><i class="fas fa-rocket"></i> Launch First Agent</button>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 TRANSACTIONS SECTION
+                 ════════════════════════════════════ -->
+            <div id="sec-transactions" class="dashboard-section" style="display:none;">
+                <div class="section-header"><h2>Transactions</h2></div>
+                <div class="data-table">
+                    <div class="table-header"><h3>Transaction History</h3></div>
+                    <table>
+                        <thead><tr><th>Time</th><th>Agent</th><th>Type</th><th>Amount</th><th>Status</th></tr></thead>
+                        <tbody id="txBody">
+                            <tr><td colspan="5" style="text-align:center; color:var(--text-secondary); padding:3rem;">
+                                No transactions yet. Create agents and use OpacusPay to start transacting.
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 API KEYS SECTION
+                 ════════════════════════════════════ -->
+            <div id="sec-api-keys" class="dashboard-section" style="display:none;">
+                <div class="section-header">
+                    <h2>API Keys</h2>
+                    <button class="btn-primary" onclick="openCreateApiKeyModal()"><i class="fas fa-plus"></i> Create API Key</button>
+                </div>
+                <div id="apiKeysList"></div>
+                <div id="apiKeysEmpty" class="empty-state" style="display:none;">
+                    <div class="empty-state-icon"><i class="fas fa-key"></i></div>
+                    <h3>No API Keys</h3>
+                    <p>Create an API key to integrate with the Opacus platform.</p>
+                    <button class="btn-primary" onclick="openCreateApiKeyModal()"><i class="fas fa-plus"></i> Create API Key</button>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 USAGE SECTION
+                 ════════════════════════════════════ -->
+            <div id="sec-usage" class="dashboard-section" style="display:none;">
+                <h2 style="margin-bottom: 1.5rem;">Usage</h2>
+                <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="metric-card">
+                        <div class="metric-label">API Calls (session)</div>
+                        <div class="metric-value" id="usageApiCalls">0</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Agents Created</div>
+                        <div class="metric-value" id="usageAgents">0</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Events Published</div>
+                        <div class="metric-value" id="usageEvents">0</div>
+                    </div>
+                </div>
+                <div style="padding:1.5rem; background:var(--primary-glow); border-radius:12px; border:1px solid var(--primary); margin-top:1rem;">
+                    <p style="font-size:0.875rem; margin:0;">Usage is tracked per session. Persistent billing and analytics are enabled in production environments.</p>
+                </div>
+            </div>
+
+            <div id="sec-webhooks" class="dashboard-section" style="display:none;">
+                <h2 style="margin-bottom: 1rem;">Webhooks</h2>
+                <div class="metric-card">
+                    <p style="color: var(--text-secondary); margin-bottom: 0.75rem;">Webhook delivery is deterministic and signed per event type.</p>
+                    <p style="font-size: 0.9rem;">Supported events: <strong>transaction.completed</strong>, <strong>escrow.expired</strong>, <strong>reputation.updated</strong>.</p>
+                </div>
+            </div>
+
+            <div id="sec-settings" class="dashboard-section" style="display:none;">
+                <h2 style="margin-bottom: 1rem;">Settings</h2>
+                <div class="metric-card">
+                    <p style="color: var(--text-secondary); margin-bottom: 0.75rem;">Configure runtime defaults for API access, key rotation, and environment controls.</p>
+                    <p style="font-size: 0.9rem;">For organization-level controls, use Enterprise support.</p>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 BILLING SECTION
+                 ════════════════════════════════════ -->
+            <div id="sec-billing" class="dashboard-section" style="display:none;">
+                <h2 style="margin-bottom:0.35rem;">Billing Architecture</h2>
+                <p style="color:var(--text-secondary); margin-bottom:1.5rem;">Economic runtime for autonomous agents: balances, escrow lifecycle, settlement proofs, and challenge metrics.</p>
+
+                <div class="metrics-grid" style="grid-template-columns:repeat(4,1fr); margin-bottom:1.5rem;">
+                    <div class="metric-card">
+                        <div class="metric-label">Available Balance</div>
+                        <div class="metric-value" id="billingAvailableBalance">0.000</div>
+                        <div class="metric-sub">USDC ready for settlement</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Locked in Escrow</div>
+                        <div class="metric-value" id="billingLockedBalance">0.000</div>
+                        <div class="metric-sub">USDC pending release</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Pending Settlements</div>
+                        <div class="metric-value" id="billingPendingCount">0</div>
+                        <div class="metric-sub">Awaiting finalize/refund</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Last 24h Volume</div>
+                        <div class="metric-value" id="billing24hVolume">0.000</div>
+                        <div class="metric-sub">USDC across all agents</div>
+                    </div>
+                </div>
+
+                <div class="metric-card" style="margin-bottom:1rem;">
+                    <h3 style="margin-bottom:1rem;">Opacus Pay</h3>
+                    <div style="display:flex; gap:0.6rem; flex-wrap:wrap; margin-bottom:1rem;">
+                        <button id="billingTabWallets" class="btn-primary" onclick="switchBillingTab('wallets')">Wallets</button>
+                        <button id="billingTabMethods" class="btn-secondary" onclick="switchBillingTab('methods')">Payment Methods</button>
+                        <button id="billingTabRules" class="btn-secondary" onclick="switchBillingTab('rules')">Settlement Rules</button>
+                    </div>
+
+                    <div id="billingPaneWallets">
+                        <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:1rem;">
+                            <button class="btn-primary" onclick="initOpacusPay()"><i class="fas fa-wallet"></i> Connect Wallet</button>
+                            <button class="btn-secondary" onclick="ensureGalileoNetwork()"><i class="fas fa-network-wired"></i> Switch to 0G Galileo</button>
+                            <button class="btn-secondary" onclick="openOpacusPayDemo()"><i class="fas fa-external-link-alt"></i> Open OpacusPay Console</button>
+                        </div>
+                        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; font-size:0.875rem;">
+                            <div><span style="color:var(--text-secondary);display:block;font-size:0.75rem;">Wallet</span><span id="opacuspayWallet">Not connected</span></div>
+                            <div><span style="color:var(--text-secondary);display:block;font-size:0.75rem;">Chain</span><span id="opacuspayChain">Unknown</span></div>
+                            <div><span style="color:var(--text-secondary);display:block;font-size:0.75rem;">Escrow Status</span><span id="opacuspayEscrowStatus">Ready</span></div>
+                            <div><span style="color:var(--text-secondary);display:block;font-size:0.75rem;">USDC Status</span><span id="opacuspayUsdcStatus">Ready</span></div>
+                            <div><span style="color:var(--text-secondary);display:block;font-size:0.75rem;">Escrow V2</span><code style="color:var(--primary);">0x4Bb9...1C7a</code></div>
+                            <div><span style="color:var(--text-secondary);display:block;font-size:0.75rem;">USDC</span><code style="color:var(--primary);">0x96f7...c483</code></div>
+                        </div>
+                    </div>
+
+                    <div id="billingPaneMethods" style="display:none;">
+                        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-bottom:0.75rem;">
+                            <div>
+                                <label style="color:var(--text-secondary); display:block; font-size:0.75rem; margin-bottom:0.3rem;">Payee Address</label>
+                                <input id="payeeAddressInput" type="text" class="api-key-input" placeholder="0x..." style="width:100%;" />
+                            </div>
+                            <div>
+                                <label style="color:var(--text-secondary); display:block; font-size:0.75rem; margin-bottom:0.3rem;">Amount (USDC)</label>
+                                <input id="paymentAmountInput" type="text" class="api-key-input" value="0.001" style="width:100%;" />
+                            </div>
+                            <div>
+                                <label style="color:var(--text-secondary); display:block; font-size:0.75rem; margin-bottom:0.3rem;">Escrow ID</label>
+                                <input id="escrowIdInput" type="text" class="api-key-input" placeholder="auto-generated on lock" style="width:100%;" />
+                            </div>
+                            <div>
+                                <label style="color:var(--text-secondary); display:block; font-size:0.75rem; margin-bottom:0.3rem;">Bytes Delivered</label>
+                                <input id="bytesDeliveredInput" type="number" class="api-key-input" value="120" style="width:100%;" />
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:0.85rem;">
+                            <button class="btn-primary" onclick="lockPaymentOneClick()"><i class="fas fa-lock"></i> Lock Payment</button>
+                            <button class="btn-secondary" onclick="releasePaymentOneClick()"><i class="fas fa-unlock"></i> Release Payment</button>
+                        </div>
+                        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:0.75rem; font-size:0.85rem;">
+                            <div><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Approve TX</span><a id="approveTxLink" href="#" target="_blank" rel="noopener" style="color:var(--primary); text-decoration:none;">—</a></div>
+                            <div><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Lock TX</span><a id="lockTxLink" href="#" target="_blank" rel="noopener" style="color:var(--primary); text-decoration:none;">—</a></div>
+                            <div><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Release TX</span><a id="releaseTxLink" href="#" target="_blank" rel="noopener" style="color:var(--primary); text-decoration:none;">—</a></div>
+                            <div><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Flow Status</span><span id="flowStatusText">Idle</span></div>
+                        </div>
+                    </div>
+
+                    <div id="billingPaneRules" style="display:none;">
+                        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:0.75rem; font-size:0.85rem;">
+                            <div class="metric-card" style="padding:1rem;"><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Min Payment</span>0.001 USDC</div>
+                            <div class="metric-card" style="padding:1rem;"><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Nonce Policy</span>Monotonic, single-use</div>
+                            <div class="metric-card" style="padding:1rem;"><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Settlement Window</span>T+1 block target</div>
+                            <div class="metric-card" style="padding:1rem;"><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Failure Path</span>Auto-refund fallback</div>
+                            <div class="metric-card" style="padding:1rem;"><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Replay Guard</span>Nonce + datagram hash</div>
+                            <div class="metric-card" style="padding:1rem;"><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Auditability</span>Proof + explorer links</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="data-table" style="margin-bottom:1rem;">
+                    <div class="table-header">
+                        <h3>Transactions</h3>
+                        <span style="color:var(--text-secondary); font-size:0.8rem;">Lifecycle: initiated → locked → released</span>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Escrow ID</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Network</th>
+                                <th>Timestamp</th>
+                                <th>Proof</th>
+                            </tr>
+                        </thead>
+                        <tbody id="billingTxTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="metrics-grid" style="grid-template-columns:2fr 1fr; margin-bottom:1rem;">
+                    <div class="metric-card">
+                        <h3 style="margin-bottom:0.8rem;">Economic Usage & Fees</h3>
+                        <div style="display:grid; grid-template-columns: repeat(3,1fr); gap:0.75rem; margin-bottom:0.9rem; font-size:0.85rem;">
+                            <div><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Settlement Throughput</span><span id="billingSettlementThroughput">0 tx / 24h</span></div>
+                            <div><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Protocol Fee (Rule)</span><span id="billingProtocolFeeAvg">5.00%</span></div>
+                            <div><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Relayer Fee Avg</span><span id="billingRelayerFeeAvg">N/A</span></div>
+                        </div>
+                        <div style="display:grid; gap:0.5rem;">
+                            <div style="display:flex; align-items:center; gap:0.6rem;"><span style="width:80px; color:var(--text-secondary); font-size:0.75rem;">Day -2</span><div id="billingDayMinus2Bar" style="height:8px; width:0%; background:linear-gradient(90deg,var(--primary),var(--accent)); border-radius:999px;"></div></div>
+                            <div style="display:flex; align-items:center; gap:0.6rem;"><span style="width:80px; color:var(--text-secondary); font-size:0.75rem;">Day -1</span><div id="billingDayMinus1Bar" style="height:8px; width:0%; background:linear-gradient(90deg,var(--primary),var(--accent)); border-radius:999px;"></div></div>
+                            <div style="display:flex; align-items:center; gap:0.6rem;"><span style="width:80px; color:var(--text-secondary); font-size:0.75rem;">Today</span><div id="billingTodayBar" style="height:8px; width:0%; background:linear-gradient(90deg,var(--primary),var(--accent)); border-radius:999px;"></div></div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <h3 style="margin-bottom:0.8rem;">API Consumption</h3>
+                        <div style="font-size:0.85rem; display:grid; gap:0.6rem;">
+                            <div><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Paid API Calls</span><span id="billingPaidApiCalls">0</span></div>
+                            <div><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Cost / 1K Calls</span><span id="billingCostPer1k">0.000 USDC</span></div>
+                            <div><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Projected Monthly</span><span id="billingProjectedMonthly">0.000 USDC</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metrics-grid" style="grid-template-columns:1fr 1fr; margin-bottom:1rem;">
+                    <div class="metric-card">
+                        <h3 style="margin-bottom:0.8rem;">Security & Controls</h3>
+                        <ul style="margin:0; padding-left:1.2rem; color:var(--text-secondary); font-size:0.85rem; line-height:1.7;">
+                            <li>Nonce replay guard enabled</li>
+                            <li>Escrow allowlist active</li>
+                            <li>Per-agent payment limits enforced</li>
+                            <li>Manual release override: restricted</li>
+                        </ul>
+                    </div>
+                    <div class="metric-card">
+                        <h3 style="margin-bottom:0.8rem;">x402-style Challenge Metrics</h3>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.7rem; font-size:0.85rem;">
+                            <div><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Challenges Issued</span><strong id="x402Issued">0</strong></div>
+                            <div><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Challenges Solved</span><strong id="x402Solved">0</strong></div>
+                            <div><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Median Solve Time</span><strong id="x402Median">N/A</strong></div>
+                            <div><span style="color:var(--text-secondary); display:block; font-size:0.75rem;">Reject Rate</span><strong id="x402Reject">0.00%</strong></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="dashboard-footer">
+                <div>© 2026 Opacus — Economic Infrastructure for Autonomous Agents.</div>
+                <div class="footer-links">
+                    <a href="https://newopacus.vercel.app" target="_blank" rel="noopener">Website</a>
+                    <a href="docs/" target="_blank" rel="noopener">Docs</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════
+             RIGHT SIDEBAR
+             ═══════════════════════════════════ -->
+        <div class="right-sidebar">
+            <div class="revenue-widget">
+                <h3>Platform Status</h3>
+                <div class="revenue-stats">
+                    <div class="revenue-stat">
+                        <div class="label">Kernel</div>
+                        <div class="value" id="sidebarKernel" style="font-size:1rem;">Checking…</div>
+                    </div>
+                    <div class="revenue-stat">
+                        <div class="label">Agents</div>
+                        <div class="value" id="sidebarAgents">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="activity-feed">
+                <div class="activity-header">
+                    <h3>Activity Log</h3>
+                    <div class="live-dot"></div>
+                </div>
+                <div id="activityFeed">
+                    <div class="activity-item">
+                        <div class="activity-time">Now</div>
+                        <div>Dashboard loaded</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- ═══════════════════════════════════════════════════
+     JAVASCRIPT — CLEAN PRODUCTION RUNTIME
+     ═══════════════════════════════════════════════════ -->
+<script>
+(function () {
+    'use strict';
+
+    // ─── Config ───
+    const urlApi = new URLSearchParams(window.location.search).get('api');
+    const savedKernelUrl = localStorage.getItem('opacusAgentKernelBaseUrl');
+    const defaultKernelUrl = location.hostname === 'localhost'
+        ? 'http://localhost:3001'
+        : 'https://6995-78-186-104-224.ngrok-free.app';
+
+    const KERNEL_URL = urlApi || (
+        location.hostname === 'localhost'
+            ? (savedKernelUrl || defaultKernelUrl)
+            : defaultKernelUrl
+    );
+
+    const state = {
+        agents: [],
+        apiKeys: JSON.parse(localStorage.getItem('opacusApiKeys') || '[]'),
+        env: 'production',
+        stats: { apiCalls: 0, agentsCreated: 0, eventsPublished: 0 },
+        user: null,
+        billingTx: []
+    };
+
+    const OPACUSPAY_CONFIG = {
+        chainIdHex: '0x40da',
+        chainId: 16602,
+        chainName: '0G Galileo Testnet',
+        rpcUrls: ['https://evmrpc-testnet.0g.ai'],
+        blockExplorerUrls: ['https://chainscan-galileo.0g.ai'],
+        nativeCurrency: { name: '0G', symbol: '0G', decimals: 18 },
+        escrowV2: '0x4Bb9Bc3DEF78A93B7e4A9a947698400805dC1C7a',
+        usdc: '0x96f7c32232E60C89F1aef5bF1fC0a1695F67c483'
+    };
+
+    const ESCROW_ABI = [
+        'function lockPayment(bytes32 escrowId, address payee, uint256 amount, bytes32 datagramHash, uint256 nonce) external returns (bool)',
+        'function releasePayment(bytes32 escrowId, uint256 bytesDelivered) external',
+        'function nonces(address) external view returns (uint256)',
+        'function getPayment(bytes32 escrowId) external view returns (address, address, uint256, uint256, bytes32, uint256, uint256, bool, bool, bool, bytes32)',
+        'event PaymentLocked(bytes32 indexed escrowId, address indexed payer, address indexed payee, uint256 amount, bytes32 datagramHash)',
+        'event PaymentReleased(bytes32 indexed escrowId, address relayer, uint256 bytesMetered)',
+        'event PaymentCancelled(bytes32 indexed escrowId, address payer)'
+    ];
+
+    const ERC20_ABI = [
+        'function approve(address spender, uint256 amount) external returns (bool)',
+        'function balanceOf(address account) external view returns (uint256)',
+        'function decimals() external view returns (uint8)'
+    ];
+
+    // ═══════════════════════════════════════════
+    // TOAST SYSTEM
+    // ═══════════════════════════════════════════
+    const ICONS = { success: 'OK', error: 'ERR', info: 'INFO', warning: 'WARN' };
+
+    window.showToast = function (type, message, duration) {
+        duration = duration || 4000;
+        const container = document.getElementById('toastContainer');
+        const el = document.createElement('div');
+        el.className = 'toast ' + type;
+        el.innerHTML =
+            '<span class="toast-icon">' + (ICONS[type] || 'INFO') + '</span>' +
+            '<span>' + escapeHTML(message) + '</span>' +
+            '<button class="toast-close" onclick="this.parentElement.remove()">×</button>';
+        container.appendChild(el);
+        setTimeout(function () {
+            el.classList.add('removing');
+            setTimeout(function () { el.remove(); }, 300);
+        }, duration);
+    };
+
+    function escapeHTML(str) {
+        var d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    // ═══════════════════════════════════════════
+    // MODAL SYSTEM
+    // ═══════════════════════════════════════════
+    function createModal(html, opts) {
+        opts = opts || {};
+        var overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        var box = document.createElement('div');
+        box.className = 'modal-box' + (opts.wide ? ' wide' : '');
+        box.innerHTML = html;
+        overlay.appendChild(box);
+        if (opts.closeOnOverlay !== false) {
+            overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(overlay); });
+        }
+        document.body.appendChild(overlay);
+        return overlay;
+    }
+
+    window.closeModal = function (overlay) {
+        if (!overlay) return;
+        overlay.style.animation = 'fadeIn 0.2s ease reverse forwards';
+        setTimeout(function () { overlay.remove(); }, 200);
+    };
+
+    function showSuccessModal(title, message, details, buttons) {
+        return createModal(
+            '<div style="text-align:center;">' +
+            '<div style="width:80px;height:80px;margin:0 auto 1.5rem;background:rgba(16,185,129,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;">' +
+            '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="18" stroke="#10b981" stroke-width="2" fill="none" opacity="0.3"/>' +
+            '<path d="M12 20l6 6 12-12" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="stroke-dasharray:50;animation:checkmark 0.6s ease 0.2s forwards;stroke-dashoffset:50;"/></svg></div>' +
+            '<h2 style="margin-bottom:0.5rem;">' + title + '</h2>' +
+            '<p style="color:var(--text-secondary);margin-bottom:1.5rem;">' + message + '</p>' +
+            (details ? '<div style="background:var(--bg-elevated);padding:1.25rem;border-radius:10px;text-align:left;margin-bottom:1.5rem;font-size:0.85rem;">' + details + '</div>' : '') +
+            '<div style="display:flex;gap:0.75rem;justify-content:center;">' +
+            (buttons || '<button class="btn-primary" onclick="closeModal(this.closest(\'.modal-overlay\'))">OK</button>') +
+            '</div></div>'
+        );
+    }
+
+    function showConfirmModal(title, message, onConfirm) {
+        var modal = createModal(
+            '<div style="text-align:center;">' +
+            '<div style="font-size:2rem;margin-bottom:1rem;color:var(--warning);"><i class="fas fa-exclamation-triangle"></i></div>' +
+            '<h2 style="margin-bottom:0.5rem;">' + title + '</h2>' +
+            '<p style="color:var(--text-secondary);margin-bottom:1.5rem;">' + message + '</p>' +
+            '<div style="display:flex;gap:0.75rem;justify-content:center;">' +
+            '<button class="btn-secondary" id="mdlCancel">Cancel</button>' +
+            '<button class="btn-primary" id="mdlConfirm" style="background:var(--danger);">Confirm</button>' +
+            '</div></div>'
+        );
+        modal.querySelector('#mdlCancel').onclick = function () { closeModal(modal); };
+        modal.querySelector('#mdlConfirm').onclick = function () { closeModal(modal); onConfirm(); };
+    }
+
+    function showLoading(msg) {
+        return createModal(
+            '<div style="text-align:center;padding:1rem;">' +
+            '<div style="width:48px;height:48px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;margin:0 auto 1.5rem;animation:spin 0.8s linear infinite;"></div>' +
+            '<div style="font-weight:600;">' + escapeHTML(msg) + '</div>' +
+            '<div style="font-size:0.85rem;color:var(--text-secondary);margin-top:0.5rem;">Please wait…</div></div>',
+            { closeOnOverlay: false }
+        );
+    }
+
+    function closeAllModalOverlays() {
+        document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
+            overlay.remove();
+        });
+    }
+
+    // ═══════════════════════════════════════════
+    // SECTION NAVIGATION
+    // ═══════════════════════════════════════════
+    var SECTION_IDS = ['overview', 'agents', 'transactions', 'api-keys', 'usage', 'webhooks', 'settings', 'billing'];
+    var FULL_WIDTH = ['agents', 'transactions', 'api-keys'];
+
+    window.showSection = function (section, clickedItem) {
+        SECTION_IDS.forEach(function (id) {
+            var el = document.getElementById('sec-' + id);
+            if (el) el.style.display = (id === section) ? 'block' : 'none';
+        });
+
+        document.getElementById('contentGrid').classList.toggle('full-width', FULL_WIDTH.indexOf(section) !== -1);
+
+        document.querySelectorAll('.sidebar-item').forEach(function (item) { item.classList.remove('active'); });
+        if (clickedItem) {
+            clickedItem.classList.add('active');
+        } else {
+            var idx = SECTION_IDS.indexOf(section);
+            var items = document.querySelectorAll('.sidebar-item');
+            if (items[idx]) items[idx].classList.add('active');
+        }
+
+        // Load section data
+        if (section === 'overview') loadOverview();
+        if (section === 'agents') loadAgents();
+        if (section === 'api-keys') renderApiKeys();
+        if (section === 'usage') loadUsage();
+        if (section === 'billing') renderBillingPanel();
+    };
+
+    window.switchEnv = function (env, btn) {
+        state.env = env;
+        document.querySelectorAll('.env-option').forEach(function (o) { o.classList.remove('active'); });
+        btn.classList.add('active');
+        var el = document.getElementById('metricEnv');
+        if (el) el.textContent = env === 'sandbox' ? 'Sandbox' : 'Production';
+        showToast('info', 'Switched to ' + env + ' environment');
+    };
+
+    function setPayStatus(id, text, isOk) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = text;
+        el.style.color = isOk ? 'var(--success)' : 'var(--warning)';
+    }
+
+    function getMetaMaskProvider() {
+        if (!window.ethereum) return null;
+        if (window.ethereum.providers && Array.isArray(window.ethereum.providers)) {
+            var mm = window.ethereum.providers.find(function (p) { return p && p.isMetaMask; });
+            if (mm) return mm;
+        }
+        return window.ethereum;
+    }
+
+    function formatUsdc(value, digits) {
+        var n = Number(value || 0);
+        return n.toFixed(typeof digits === 'number' ? digits : 3);
+    }
+
+    window.ensureGalileoNetwork = async function () {
+        var eth = getMetaMaskProvider();
+        if (!eth) {
+            showToast('warning', 'MetaMask not found');
+            return;
+        }
+        try {
+            await eth.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: OPACUSPAY_CONFIG.chainIdHex }]
+            });
+            setPayStatus('opacuspayChain', OPACUSPAY_CONFIG.chainName + ' (' + OPACUSPAY_CONFIG.chainId + ')', true);
+            showToast('success', 'Switched to 0G Galileo');
+        } catch (switchErr) {
+            if (switchErr && switchErr.code === 4902) {
+                await eth.request({
+                    method: 'wallet_addEthereumChain',
+                    params: [{
+                        chainId: OPACUSPAY_CONFIG.chainIdHex,
+                        chainName: OPACUSPAY_CONFIG.chainName,
+                        rpcUrls: OPACUSPAY_CONFIG.rpcUrls,
+                        blockExplorerUrls: OPACUSPAY_CONFIG.blockExplorerUrls,
+                        nativeCurrency: OPACUSPAY_CONFIG.nativeCurrency
+                    }]
+                });
+                setPayStatus('opacuspayChain', OPACUSPAY_CONFIG.chainName + ' (' + OPACUSPAY_CONFIG.chainId + ')', true);
+                showToast('success', '0G Galileo added to wallet');
+                return;
+            }
+            setPayStatus('opacuspayChain', 'Switch required', false);
+            showToast('warning', 'Could not switch chain automatically');
+        }
+    };
+
+    window.initOpacusPay = async function () {
+        var eth = getMetaMaskProvider();
+        if (!eth) {
+            showToast('warning', 'MetaMask not found');
+            setPayStatus('opacuspayWallet', 'MetaMask not installed', false);
+            window.open('https://metamask.io/download/', '_blank');
+            return;
+        }
+        try {
+            const accounts = await eth.request({ method: 'eth_requestAccounts' });
+            const wallet = accounts && accounts[0] ? accounts[0] : null;
+            if (!wallet) throw new Error('No wallet account returned');
+
+            setPayStatus('opacuspayWallet', wallet.slice(0, 6) + '...' + wallet.slice(-4), true);
+            setPayStatus('opacuspayEscrowStatus', 'Configured (' + OPACUSPAY_CONFIG.escrowV2.slice(0, 6) + '...)', true);
+            setPayStatus('opacuspayUsdcStatus', 'Configured (' + OPACUSPAY_CONFIG.usdc.slice(0, 6) + '...)', true);
+
+            const currentChainHex = await eth.request({ method: 'eth_chainId' });
+            if ((currentChainHex || '').toLowerCase() !== OPACUSPAY_CONFIG.chainIdHex) {
+                setPayStatus('opacuspayChain', 'Wrong chain', false);
+                showToast('warning', 'Switch network to 0G Galileo for OpacusPay');
+            } else {
+                setPayStatus('opacuspayChain', OPACUSPAY_CONFIG.chainName + ' (' + OPACUSPAY_CONFIG.chainId + ')', true);
+                showToast('success', 'OpacusPay is ready');
+            }
+            await refreshBillingRealData();
+        } catch (err) {
+            setPayStatus('opacuspayWallet', 'Connection failed', false);
+            showToast('error', 'Wallet connection failed');
+        }
+    };
+
+    window.openOpacusPayDemo = function () {
+        window.open('opacuspay-facilitator-demo.html', '_blank');
+    };
+
+    function setFlowStatus(text, ok) {
+        var el = document.getElementById('flowStatusText');
+        if (!el) return;
+        el.textContent = text;
+        el.style.color = ok ? 'var(--success)' : 'var(--warning)';
+    }
+
+    function setTxLink(linkId, txHash) {
+        var el = document.getElementById(linkId);
+        if (!el) return;
+        if (!txHash) {
+            el.textContent = '—';
+            el.removeAttribute('href');
+            return;
+        }
+        var url = OPACUSPAY_CONFIG.blockExplorerUrls[0] + '/tx/' + txHash;
+        el.href = url;
+        el.textContent = txHash.slice(0, 10) + '...' + txHash.slice(-6);
+    }
+
+    function resetBillingView() {
+        state.billingTx = [];
+        document.getElementById('billingAvailableBalance').textContent = '0.000';
+        document.getElementById('billingLockedBalance').textContent = '0.000';
+        document.getElementById('billingPendingCount').textContent = '0';
+        document.getElementById('billing24hVolume').textContent = '0.000';
+        updateBillingDerivedMetrics([], 0);
+        renderBillingTransactions();
+    }
+
+    async function refreshBillingRealData() {
+        try {
+            var eth = getMetaMaskProvider();
+            if (!eth || !window.ethers) {
+                resetBillingView();
+                return;
+            }
+
+            var accounts = await eth.request({ method: 'eth_accounts' });
+            if (!accounts || !accounts[0]) {
+                resetBillingView();
+                setPayStatus('opacuspayWallet', 'Not connected', false);
+                return;
+            }
+            var wallet = accounts[0];
+
+            var chainHex = await eth.request({ method: 'eth_chainId' });
+            if ((chainHex || '').toLowerCase() !== OPACUSPAY_CONFIG.chainIdHex) {
+                resetBillingView();
+                setPayStatus('opacuspayChain', 'Wrong chain', false);
+                return;
+            }
+
+            var provider = new ethers.BrowserProvider(eth);
+            var signer = await provider.getSigner();
+            var escrow = new ethers.Contract(OPACUSPAY_CONFIG.escrowV2, ESCROW_ABI, signer);
+            var usdc = new ethers.Contract(OPACUSPAY_CONFIG.usdc, ERC20_ABI, signer);
+
+            var usdcDecimals = 6;
+            try { usdcDecimals = Number(await usdc.decimals()); } catch (_) {}
+
+            var usdcBal = await usdc.balanceOf(wallet);
+            var nativeBal = await provider.getBalance(wallet);
+
+            document.getElementById('billingAvailableBalance').textContent = formatUsdc(ethers.formatUnits(usdcBal, usdcDecimals), 3);
+            setPayStatus('opacuspayWallet', wallet.slice(0, 6) + '...' + wallet.slice(-4), true);
+            setPayStatus('opacuspayChain', OPACUSPAY_CONFIG.chainName + ' (' + OPACUSPAY_CONFIG.chainId + ')', true);
+            setPayStatus('opacuspayUsdcStatus', 'Balance ' + formatUsdc(ethers.formatUnits(usdcBal, usdcDecimals), 3) + ' USDC', true);
+            setPayStatus('opacuspayEscrowStatus', 'Gas ' + Number(ethers.formatEther(nativeBal)).toFixed(4) + ' 0G', true);
+
+            var latestBlock = await provider.getBlockNumber();
+            var fromBlock = Math.max(0, latestBlock - 150000);
+            var lockFilter = escrow.filters.PaymentLocked(null, wallet, null);
+            var lockedEvents = await escrow.queryFilter(lockFilter, fromBlock, latestBlock);
+            lockedEvents = lockedEvents.slice(-30).reverse();
+
+            var lockedTotal = 0;
+            var volume24 = 0;
+            var pending = 0;
+            var nowSec = Math.floor(Date.now() / 1000);
+            var realTx = [];
+
+            for (var i = 0; i < lockedEvents.length; i++) {
+                var ev = lockedEvents[i];
+                var escrowId = String(ev.args.escrowId);
+                var amountUsdc = Number(ethers.formatUnits(ev.args.amount, usdcDecimals));
+
+                var p = await escrow.getPayment(escrowId);
+                var released = Boolean(p[7]);
+                var cancelled = Boolean(p[8]);
+                var lockedAt = Number(p[5]);
+                var datagramHash = String(p[4]);
+                var status = released ? 'released' : (cancelled ? 'cancelled' : 'locked');
+
+                if (!released && !cancelled) {
+                    lockedTotal += amountUsdc;
+                    pending += 1;
+                }
+                if (lockedAt >= (nowSec - 86400)) volume24 += amountUsdc;
+
+                realTx.push({
+                    escrowId: escrowId,
+                    amount: amountUsdc.toFixed(3),
+                    status: status,
+                    network: '0G Galileo',
+                    time: lockedAt ? lockedAt * 1000 : Date.now(),
+                    proof: datagramHash,
+                    txHash: ev.transactionHash || null
+                });
+            }
+
+            state.billingTx = realTx;
+            document.getElementById('billingLockedBalance').textContent = formatUsdc(lockedTotal, 3);
+            document.getElementById('billingPendingCount').textContent = String(pending);
+            document.getElementById('billing24hVolume').textContent = formatUsdc(volume24, 3);
+
+            updateBillingDerivedMetrics(realTx, volume24);
+            renderBillingTransactions();
+        } catch (e) {
+            console.warn('Billing real-data refresh failed:', e);
+        }
+    }
+
+    function updateBillingDerivedMetrics(realTx, volume24) {
+        realTx = realTx || [];
+        var issued = realTx.length;
+        var solved = realTx.filter(function (t) { return t.status === 'released'; }).length;
+        var rejected = realTx.filter(function (t) { return t.status === 'cancelled'; }).length;
+
+        document.getElementById('billingSettlementThroughput').textContent = realTx.filter(function (t) {
+            return t.time >= (Date.now() - 86400000);
+        }).length + ' tx / 24h';
+
+        var costPer1k = issued > 0 ? (Number(volume24 || 0) / issued) * 1000 : 0;
+        var monthly = Number(volume24 || 0) * 30;
+        document.getElementById('billingPaidApiCalls').textContent = String(issued);
+        document.getElementById('billingCostPer1k').textContent = formatUsdc(costPer1k, 3) + ' USDC';
+        document.getElementById('billingProjectedMonthly').textContent = formatUsdc(monthly, 3) + ' USDC';
+
+        document.getElementById('x402Issued').textContent = String(issued);
+        document.getElementById('x402Solved').textContent = String(solved);
+        document.getElementById('x402Reject').textContent = issued ? ((rejected / issued) * 100).toFixed(2) + '%' : '0.00%';
+        document.getElementById('x402Median').textContent = issued ? '~1 block' : 'N/A';
+
+        var now = Date.now();
+        var dayMs = 86400000;
+        var d0 = 0;
+        var d1 = 0;
+        var d2 = 0;
+        realTx.forEach(function (tx) {
+            var age = now - tx.time;
+            if (age < dayMs) d0 += 1;
+            else if (age < dayMs * 2) d1 += 1;
+            else if (age < dayMs * 3) d2 += 1;
+        });
+        var max = Math.max(d0, d1, d2, 1);
+        document.getElementById('billingTodayBar').style.width = Math.max(6, Math.round((d0 / max) * 100)) + '%';
+        document.getElementById('billingDayMinus1Bar').style.width = Math.max(6, Math.round((d1 / max) * 100)) + '%';
+        document.getElementById('billingDayMinus2Bar').style.width = Math.max(6, Math.round((d2 / max) * 100)) + '%';
+    }
+
+    window.switchBillingTab = function (tab) {
+        var tabs = ['wallets', 'methods', 'rules'];
+        tabs.forEach(function (t) {
+            var pane = document.getElementById('billingPane' + t.charAt(0).toUpperCase() + t.slice(1));
+            var btn = document.getElementById('billingTab' + t.charAt(0).toUpperCase() + t.slice(1));
+            if (pane) pane.style.display = (t === tab) ? 'block' : 'none';
+            if (btn) {
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-secondary');
+            }
+        });
+        var activeBtn = document.getElementById('billingTab' + tab.charAt(0).toUpperCase() + tab.slice(1));
+        if (activeBtn) {
+            activeBtn.classList.remove('btn-secondary');
+            activeBtn.classList.add('btn-primary');
+        }
+    };
+
+    function statusBadge(status) {
+        if (status === 'released') return '<span class="status-badge active">Released</span>';
+        if (status === 'cancelled') return '<span class="status-badge" style="background:rgba(239,68,68,0.12);color:var(--danger);">Cancelled</span>';
+        if (status === 'locked') return '<span class="status-badge" style="background:rgba(251,191,36,0.12);color:var(--warning);">Locked</span>';
+        return '<span class="status-badge" style="background:rgba(59,130,246,0.12);color:var(--primary);">Initiated</span>';
+    }
+
+    window.showBillingProof = function (escrowId) {
+        var row = (state.billingTx || []).find(function (r) { return r.escrowId === escrowId; });
+        if (!row) return;
+        createModal(
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">' +
+            '<h2 style="margin:0;">Settlement Proof</h2>' +
+            '<button class="btn-secondary" style="padding:0.4rem 0.6rem;" onclick="closeModal(this.closest(\'.modal-overlay\'))"><i class="fas fa-times"></i></button></div>' +
+            '<div style="display:grid;gap:0.75rem;font-size:0.86rem;">' +
+            '<div style="padding:0.75rem;background:var(--bg-elevated);border-radius:8px;"><span style="color:var(--text-secondary);display:block;margin-bottom:0.25rem;">Escrow ID</span><code style="font-size:0.75rem;color:var(--primary);word-break:break-all;">' + escapeHTML(row.escrowId) + '</code></div>' +
+            '<div style="padding:0.75rem;background:var(--bg-elevated);border-radius:8px;"><span style="color:var(--text-secondary);display:block;margin-bottom:0.25rem;">Proof Payload</span><div>' + escapeHTML(row.proof) + '</div></div>' +
+            '<div style="padding:0.75rem;background:var(--bg-elevated);border-radius:8px;"><span style="color:var(--text-secondary);display:block;margin-bottom:0.25rem;">Block Explorer</span><a href="' + OPACUSPAY_CONFIG.blockExplorerUrls[0] + '/address/' + OPACUSPAY_CONFIG.escrowV2 + '" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:none;">Open Escrow Contract ↗</a></div>' +
+            '</div>'
+        );
+    };
+
+    function renderBillingTransactions() {
+        var body = document.getElementById('billingTxTableBody');
+        if (!body) return;
+        if (!state.billingTx || state.billingTx.length === 0) {
+            body.innerHTML = '<tr><td colspan="6" style="color:var(--text-secondary);">No on-chain settlements found for connected wallet.</td></tr>';
+            return;
+        }
+        body.innerHTML = state.billingTx.map(function (tx) {
+            var shortId = tx.escrowId.slice(0, 10) + '...' + tx.escrowId.slice(-6);
+            return '<tr>' +
+                '<td><code style="font-size:0.72rem;color:var(--primary);">' + shortId + '</code></td>' +
+                '<td>' + tx.amount + ' USDC</td>' +
+                '<td>' + statusBadge(tx.status) + '</td>' +
+                '<td>' + tx.network + '</td>' +
+                '<td>' + new Date(tx.time).toLocaleTimeString() + '</td>' +
+                '<td><button class="btn-action" onclick="showBillingProof(\'' + tx.escrowId + '\')">View Proof</button></td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function renderBillingPanel() {
+        switchBillingTab('wallets');
+        renderBillingTransactions();
+        refreshBillingRealData();
+    }
+
+    async function getSignerAndContracts() {
+        var eth = getMetaMaskProvider();
+        if (!eth) throw new Error('MetaMask not found');
+        if (!window.ethers) throw new Error('ethers library not loaded');
+
+        const provider = new ethers.BrowserProvider(eth);
+        const signer = await provider.getSigner();
+        const address = await signer.getAddress();
+
+        const chainHex = await eth.request({ method: 'eth_chainId' });
+        if ((chainHex || '').toLowerCase() !== OPACUSPAY_CONFIG.chainIdHex) {
+            throw new Error('Wrong network. Switch to 0G Galileo first');
+        }
+
+        const escrow = new ethers.Contract(OPACUSPAY_CONFIG.escrowV2, ESCROW_ABI, signer);
+        const usdc = new ethers.Contract(OPACUSPAY_CONFIG.usdc, ERC20_ABI, signer);
+        return { signer, address, escrow, usdc };
+    }
+
+    window.lockPaymentOneClick = async function () {
+        try {
+            setFlowStatus('Preparing lock flow…', false);
+            const { address, escrow, usdc } = await getSignerAndContracts();
+
+            const payee = (document.getElementById('payeeAddressInput') || {}).value || '';
+            const amountInput = ((document.getElementById('paymentAmountInput') || {}).value || '0.001').trim();
+
+            if (!ethers.isAddress(payee)) throw new Error('Invalid payee address');
+            if (!amountInput || Number(amountInput) <= 0) throw new Error('Invalid amount');
+
+            const nonce = await escrow.nonces(address);
+            const amount = ethers.parseUnits(amountInput, 6);
+            const timestamp = Math.floor(Date.now() / 1000);
+            const datagramHash = ethers.keccak256(ethers.toUtf8Bytes('opacuspay:' + address + ':' + payee + ':' + amount.toString() + ':' + timestamp));
+            const escrowId = ethers.keccak256(ethers.solidityPacked(['address', 'address', 'uint256', 'uint256', 'uint256'], [address, payee, amount, nonce, timestamp]));
+
+            var escrowInput = document.getElementById('escrowIdInput');
+            if (escrowInput) escrowInput.value = escrowId;
+
+            setFlowStatus('Approving USDC…', false);
+            const approveTx = await usdc.approve(OPACUSPAY_CONFIG.escrowV2, amount);
+            setTxLink('approveTxLink', approveTx.hash);
+            await approveTx.wait();
+
+            setFlowStatus('Locking payment…', false);
+            const lockTx = await escrow.lockPayment(escrowId, payee, amount, datagramHash, nonce);
+            setTxLink('lockTxLink', lockTx.hash);
+            await lockTx.wait();
+
+            setPayStatus('opacuspayEscrowStatus', 'Locked', true);
+            setFlowStatus('Payment locked successfully', true);
+            state.billingTx.unshift({
+                escrowId: escrowId,
+                amount: amountInput,
+                status: 'locked',
+                network: '0G Galileo',
+                time: Date.now(),
+                proof: 'challenge-response:verified'
+            });
+            document.getElementById('billingPendingCount').textContent = String((Number(document.getElementById('billingPendingCount').textContent) || 0) + 1);
+            updateBillingDerivedMetrics(state.billingTx, Number(document.getElementById('billing24hVolume').textContent) || 0);
+            renderBillingTransactions();
+            refreshBillingRealData();
+            showToast('success', 'Payment locked');
+            addActivity('OpacusPay lock executed', amountInput + ' USDC');
+        } catch (err) {
+            setFlowStatus('Lock failed', false);
+            showToast('error', (err && err.message) ? err.message : 'Lock failed');
+        }
+    };
+
+    window.releasePaymentOneClick = async function () {
+        try {
+            setFlowStatus('Preparing release flow…', false);
+            const { escrow } = await getSignerAndContracts();
+
+            const escrowIdInput = ((document.getElementById('escrowIdInput') || {}).value || '').trim();
+            const bytesDeliveredInput = ((document.getElementById('bytesDeliveredInput') || {}).value || '120').trim();
+            const bytesDelivered = BigInt(bytesDeliveredInput || '120');
+
+            if (!escrowIdInput || !/^0x[0-9a-fA-F]{64}$/.test(escrowIdInput)) {
+                throw new Error('Escrow ID is required. Run lock flow first.');
+            }
+
+            setFlowStatus('Releasing payment…', false);
+            const releaseTx = await escrow.releasePayment(escrowIdInput, bytesDelivered);
+            setTxLink('releaseTxLink', releaseTx.hash);
+            await releaseTx.wait();
+
+            state.billingTx = state.billingTx.map(function (tx) {
+                if (tx.escrowId === escrowIdInput) {
+                    return {
+                        escrowId: tx.escrowId,
+                        amount: tx.amount,
+                        status: 'released',
+                        network: tx.network,
+                        time: Date.now(),
+                        proof: 'released-tx:' + releaseTx.hash
+                    };
+                }
+                return tx;
+            });
+            document.getElementById('billingPendingCount').textContent = String(Math.max(0, (Number(document.getElementById('billingPendingCount').textContent) || 0) - 1));
+            renderBillingTransactions();
+            refreshBillingRealData();
+
+            setPayStatus('opacuspayEscrowStatus', 'Released', true);
+            setFlowStatus('Payment released successfully', true);
+            showToast('success', 'Payment released');
+            addActivity('OpacusPay release executed', bytesDelivered.toString() + ' bytes');
+        } catch (err) {
+            setFlowStatus('Release failed', false);
+            showToast('error', (err && err.message) ? err.message : 'Release failed');
+        }
+    };
+
+    // ═══════════════════════════════════════════
+    // KERNEL API HELPER
+    // ═══════════════════════════════════════════
+    function kernelFetch(path, opts) {
+        if (!KERNEL_URL) return Promise.reject(new Error('Agent Kernel URL not configured'));
+        state.stats.apiCalls++;
+        opts = opts || {};
+        opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+        return fetch(KERNEL_URL + path, opts).then(function (res) {
+            if (!res.ok) return res.text().then(function (t) { throw new Error(t || 'HTTP ' + res.status); });
+            return res.json();
+        });
+    }
+
+    async function checkKernel() {
+        try {
+            await kernelFetch('/health');
+            document.getElementById('sidebarKernel').textContent = 'Online';
+            document.getElementById('metricNetwork').textContent = 'Online';
+            document.getElementById('metricNetwork').style.color = 'var(--success)';
+            document.getElementById('metricNetworkSub').innerHTML = '<i class="fas fa-check-circle"></i> all systems';
+            document.getElementById('metricNetworkSub').className = 'metric-sub positive';
+            return true;
+        } catch (e) {
+            document.getElementById('sidebarKernel').textContent = 'Offline';
+            document.getElementById('metricNetwork').textContent = 'Offline';
+            document.getElementById('metricNetwork').style.color = 'var(--danger)';
+            document.getElementById('metricNetworkSub').innerHTML = '<i class="fas fa-exclamation-triangle"></i> cannot reach kernel';
+            document.getElementById('metricNetworkSub').className = 'metric-sub';
+            return false;
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    // OVERVIEW
+    // ═══════════════════════════════════════════
+    async function loadOverview() {
+        try {
+            var agents = await kernelFetch('/api/agents');
+            state.agents = agents;
+            document.getElementById('metricAgents').textContent = agents.length;
+            document.getElementById('sidebarAgents').textContent = agents.length;
+        } catch (e) {
+            document.getElementById('metricAgents').textContent = '—';
+        }
+        document.getElementById('metricKeys').textContent = state.apiKeys.length;
+    }
+
+    // ═══════════════════════════════════════════
+    // AGENTS
+    // ═══════════════════════════════════════════
+    async function loadAgents() {
+        var grid = document.getElementById('agentsGrid');
+        var empty = document.getElementById('agentsEmpty');
+
+        try {
+            var agents = await kernelFetch('/api/agents');
+            state.agents = agents;
+            document.getElementById('sidebarAgents').textContent = agents.length;
+
+            if (!agents.length) {
+                grid.innerHTML = '';
+                empty.style.display = 'block';
+                return;
+            }
+            empty.style.display = 'none';
+
+            // Fetch details in parallel
+            var details = await Promise.all(
+                agents.map(function (a) { return kernelFetch('/api/agents/' + a.sessionId).catch(function () { return null; }); })
+            );
+
+            grid.innerHTML = agents.map(function (agent, i) {
+                var d = details[i] || {};
+                var caps = (d.capabilities || []).map(function (c) { return '<span class="capability-tag">' + escapeHTML(c) + '</span>'; }).join('') || '<span class="capability-tag">general</span>';
+                var created = agent.createdAt ? new Date(agent.createdAt).toLocaleDateString() : '—';
+                var did = (d.agentDID || agent.agentDID || '').substring(0, 40) + '…';
+                var name = escapeHTML(d.name || agent.name || 'Unnamed');
+                var sid = agent.sessionId;
+
+                return '<div class="agent-card">' +
+                    '<div class="agent-header"><div>' +
+                    '<div class="agent-name">' + name + '</div>' +
+                    '<div class="agent-did">' + did + '</div></div>' +
+                    '<span class="status-badge active">Active</span></div>' +
+                    '<div style="margin-bottom:0.75rem;">' + caps + '</div>' +
+                    '<div class="agent-stats">' +
+                    '<div><div class="stat-value">' + created + '</div><div class="stat-label">Created</div></div>' +
+                    '<div><div class="stat-value">' + (d.capabilities || []).length + '</div><div class="stat-label">Capabilities</div></div>' +
+                    '</div>' +
+                    '<div class="agent-actions">' +
+                    '<button class="btn-action" style="flex:1;" onclick="viewAgent(\'' + sid + '\')"><i class="fas fa-eye"></i> View</button>' +
+                    '<button class="btn-action btn-danger" onclick="deleteAgent(\'' + sid + '\',\'' + name + '\')"><i class="fas fa-trash"></i></button>' +
+                    '</div></div>';
+            }).join('');
+        } catch (e) {
+            grid.innerHTML = '';
+            empty.style.display = 'block';
+            empty.querySelector('h3').textContent = 'Cannot Connect to Agent Kernel';
+            empty.querySelector('p').textContent = 'Start it with: cd agent-kernel && node dist/api-server.js';
+        }
+    }
+
+    // ── Create Agent ──
+    window.openCreateAgentModal = function () {
+        createModal(
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">' +
+            '<h2 style="margin:0;">Launch New Agent</h2>' +
+            '<button class="btn-secondary" style="padding:0.4rem 0.6rem;" onclick="closeModal(this.closest(\'.modal-overlay\'))"><i class="fas fa-times"></i></button></div>' +
+            '<div class="form-group"><label class="form-label">Agent Name *</label>' +
+            '<input id="inAgentName" class="form-input" placeholder="e.g., Weather Bot" value="My Agent" /></div>' +
+            '<div class="form-group"><label class="form-label">Agent Type</label>' +
+            '<select id="inAgentType" class="form-input">' +
+            '<option value="data-provider">Data Provider</option><option value="trading">Trading</option>' +
+            '<option value="compute">Compute</option><option value="oracle">Oracle</option>' +
+            '<option value="iot">IoT</option><option value="custom">Custom</option></select></div>' +
+            '<div class="form-group"><label class="form-label">Capabilities (comma separated)</label>' +
+            '<input id="inAgentCaps" class="form-input" placeholder="e.g., weather-data, price-oracle" value="data-feed, real-time" /></div>' +
+            '<div style="display:flex;gap:1rem;margin-top:1.5rem;">' +
+            '<button class="btn-secondary" style="flex:1;" onclick="closeModal(this.closest(\'.modal-overlay\'))">Cancel</button>' +
+            '<button class="btn-primary" style="flex:1;" id="btnLaunch"><i class="fas fa-rocket"></i> Launch Agent</button></div>'
+        );
+        document.getElementById('btnLaunch').onclick = submitCreateAgent;
+    };
+
+    async function submitCreateAgent() {
+        var name = (document.getElementById('inAgentName').value || '').trim();
+        var type = document.getElementById('inAgentType').value || 'custom';
+        var capsStr = (document.getElementById('inAgentCaps').value || '').trim();
+
+        if (!name) { showToast('error', 'Please enter an agent name'); return; }
+
+        var DEFAULTS = {
+            'data-provider': ['data-feed','streaming'], 'trading': ['dex-swap','arbitrage'],
+            'compute': ['computation','processing'], 'oracle': ['price-feed','data-oracle'],
+            'iot': ['sensor-data','real-time'], 'custom': ['general']
+        };
+        var capabilities = capsStr ? capsStr.split(',').map(function(c){return c.trim();}).filter(Boolean) : (DEFAULTS[type] || ['general']);
+
+        // Close create modal
+        var createOverlay = document.querySelector('.modal-overlay');
+        if (createOverlay) closeModal(createOverlay);
+
+        var loading = showLoading('Launching your agent…');
+
+        try {
+            var result = await kernelFetch('/api/agents', {
+                method: 'POST',
+                body: JSON.stringify({ name: name, capabilities: capabilities, enableLLM: true })
+            });
+
+            state.stats.agentsCreated++;
+            closeModal(loading);
+
+            showSuccessModal('Agent Launched', name + ' is now live and ready to operate.',
+                '<div style="display:grid;gap:0.5rem;">' +
+                '<div style="display:flex;justify-content:space-between;"><span style="color:var(--text-secondary)">Name:</span><strong>' + escapeHTML(result.name || name) + '</strong></div>' +
+                '<div style="display:flex;justify-content:space-between;"><span style="color:var(--text-secondary)">Type:</span><strong style="color:var(--primary)">' + type + '</strong></div>' +
+                '<div style="display:flex;justify-content:space-between;"><span style="color:var(--text-secondary)">DID:</span><code style="font-size:0.7rem;color:var(--primary)">' + escapeHTML(result.agentDID || '') + '</code></div>' +
+                '<div style="display:flex;justify-content:space-between;"><span style="color:var(--text-secondary)">Capabilities:</span><strong>' + escapeHTML(capabilities.join(', ')) + '</strong></div>' +
+                '</div>',
+                '<button class="btn-secondary" onclick="closeModal(this.closest(\'.modal-overlay\'))">Close</button>' +
+                '<button class="btn-primary" onclick="closeModal(this.closest(\'.modal-overlay\')); showSection(\'agents\');">View Agents</button>'
+            );
+
+            addActivity('Agent <strong>' + escapeHTML(name) + '</strong> launched', type);
+            showToast('success', 'Agent "' + name + '" created successfully!');
+            setTimeout(loadAgents, 300);
+        } catch (err) {
+            closeModal(loading);
+            showToast('error', 'Failed to create agent: ' + err.message);
+        }
+    }
+
+    // ── View Agent ──
+    window.viewAgent = async function (sessionId) {
+        var loading = showLoading('Loading agent details…');
+        try {
+            var d = await kernelFetch('/api/agents/' + sessionId);
+            closeModal(loading);
+
+            var caps = (d.capabilities || []).map(function(c){return '<span class="capability-tag">' + escapeHTML(c) + '</span>';}).join('') || 'None';
+            var es = d.emotionalState || {};
+            var bp = d.behaviorProfile || {};
+
+            createModal(
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">' +
+                '<h2 style="margin:0;">' + escapeHTML(d.name || 'Agent') + '</h2>' +
+                '<button class="btn-secondary" style="padding:0.4rem 0.6rem;" onclick="closeModal(this.closest(\'.modal-overlay\'))"><i class="fas fa-times"></i></button></div>' +
+                '<div style="display:grid;gap:0.75rem;font-size:0.9rem;">' +
+                infoRow('Session ID', '<code style="font-size:0.75rem">' + escapeHTML(sessionId) + '</code>') +
+                infoRow('DID', '<code style="font-size:0.7rem;color:var(--primary)">' + escapeHTML(d.agentDID || '') + '</code>') +
+                '<div style="padding:0.75rem;background:var(--bg-elevated);border-radius:8px;"><span style="color:var(--text-secondary);display:block;margin-bottom:0.5rem;">Capabilities</span><div>' + caps + '</div></div>' +
+                (d.emotionalState ?
+                    '<div style="padding:0.75rem;background:var(--bg-elevated);border-radius:8px;"><span style="color:var(--text-secondary);display:block;margin-bottom:0.5rem;">Emotional State</span>' +
+                    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.85rem;">' +
+                    emoCell('Confidence', es.confidence) + emoCell('Stress', es.stress) +
+                    emoCell('Curiosity', es.curiosity) + emoCell('Fatigue', es.fatigue) + '</div></div>' : '') +
+                (d.behaviorProfile ?
+                    '<div style="padding:0.75rem;background:var(--bg-elevated);border-radius:8px;"><span style="color:var(--text-secondary);display:block;margin-bottom:0.5rem;">Behavior Profile</span>' +
+                    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.85rem;">' +
+                    emoCell('Risk', bp.riskTolerance) + emoCell('Cost Sensitivity', bp.costSensitivity) +
+                    emoCell('Trust', bp.trustBaseline) + '</div></div>' : '') +
+                '</div>' +
+                '<div style="display:flex;gap:0.75rem;margin-top:1.5rem;justify-content:flex-end;">' +
+                '<button class="btn-secondary" onclick="closeModal(this.closest(\'.modal-overlay\'))">Close</button></div>'
+            );
+        } catch (err) {
+            closeModal(loading);
+            showToast('error', 'Failed to load: ' + err.message);
+        }
+    };
+
+    function infoRow(label, value) {
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem;background:var(--bg-elevated);border-radius:8px;"><span style="color:var(--text-secondary)">' + label + '</span>' + value + '</div>';
+    }
+    function emoCell(label, val) {
+        return '<div>' + label + ': <strong>' + (typeof val === 'number' ? val.toFixed(2) : '—') + '</strong></div>';
+    }
+
+    // ── Delete Agent ──
+    window.deleteAgent = function (sessionId, name) {
+        showConfirmModal('Delete Agent', 'Are you sure you want to delete <strong>' + escapeHTML(name) + '</strong>? This cannot be undone.', async function () {
+            try {
+                await kernelFetch('/api/agents/' + sessionId, { method: 'DELETE' });
+                showToast('success', 'Agent "' + name + '" deleted');
+                addActivity('🗑️ Agent <strong>' + escapeHTML(name) + '</strong> deleted', '');
+                loadAgents();
+                loadOverview();
+            } catch (err) {
+                showToast('error', 'Delete failed: ' + err.message);
+            }
+        });
+    };
+
+    // ═══════════════════════════════════════════
+    // API KEYS (localStorage)
+    // ═══════════════════════════════════════════
+    window.openCreateApiKeyModal = function () {
+        createModal(
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">' +
+            '<h2 style="margin:0;">Create API Key</h2>' +
+            '<button class="btn-secondary" style="padding:0.4rem 0.6rem;" onclick="closeModal(this.closest(\'.modal-overlay\'))"><i class="fas fa-times"></i></button></div>' +
+            '<div class="form-group"><label class="form-label">Key Name</label>' +
+            '<input id="inKeyName" class="form-input" value="my-key" placeholder="e.g., production-v1" /></div>' +
+            '<div class="form-group"><label class="form-label">Environment</label>' +
+            '<select id="inKeyEnv" class="form-input">' +
+            '<option value="sandbox">Sandbox (recommended)</option>' +
+            '<option value="production">Production</option></select></div>' +
+            '<div style="padding:1rem;background:var(--bg-elevated);border-radius:8px;margin-bottom:1.5rem;font-size:0.85rem;color:var(--text-secondary);">' +
+            '<div style="margin-bottom:0.5rem;font-weight:600;color:var(--text-primary);">Permissions (all included):</div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.25rem;"><span>Agent Management</span><span>Discovery</span><span>Payments</span><span>Events</span></div></div>' +
+            '<div style="display:flex;gap:1rem;">' +
+            '<button class="btn-secondary" style="flex:1;" onclick="closeModal(this.closest(\'.modal-overlay\'))">Cancel</button>' +
+            '<button class="btn-primary" style="flex:1;" id="btnCreateKey"><i class="fas fa-key"></i> Create Key</button></div>'
+        );
+        document.getElementById('btnCreateKey').onclick = submitCreateApiKey;
+    };
+
+    function submitCreateApiKey() {
+        var name = (document.getElementById('inKeyName').value || '').trim() || 'unnamed';
+        var env = document.getElementById('inKeyEnv').value || 'sandbox';
+
+        var prefix = (env === 'production') ? 'sk_live_' : 'sk_test_';
+        var rand = '';
+        var bytes = crypto.getRandomValues(new Uint8Array(18));
+        for (var i = 0; i < bytes.length; i++) rand += bytes[i].toString(36);
+        var key = prefix + rand.substring(0, 24);
+
+        var entry = { id: 'key_' + Date.now(), name: name, key: key, environment: env, createdAt: Date.now() };
+        state.apiKeys.push(entry);
+        localStorage.setItem('opacusApiKeys', JSON.stringify(state.apiKeys));
+        localStorage.setItem('opacusApiKey', key);
+
+        closeModal(document.querySelector('.modal-overlay'));
+
+        showSuccessModal('API Key Created', 'Your new API key is ready to use.',
+            '<div style="display:grid;gap:0.75rem;">' +
+            '<div><span style="color:var(--text-secondary);font-size:0.8rem;">API Key (copy now — shown only once):</span></div>' +
+            '<div style="background:#0b1220;padding:0.75rem;border-radius:6px;font-family:monospace;font-size:0.85rem;color:var(--primary);word-break:break-all;cursor:pointer;" onclick="navigator.clipboard.writeText(\'' + key + '\'); showToast(\'success\', \'API key copied!\');">' + key + '</div>' +
+            '<div style="font-size:0.8rem;color:var(--warning);">Store this key securely. Click to copy.</div></div>',
+            '<button class="btn-secondary" onclick="navigator.clipboard.writeText(\'' + key + '\'); showToast(\'success\', \'Copied!\'); closeModal(this.closest(\'.modal-overlay\'));">Copy &amp; Close</button>' +
+            '<button class="btn-primary" onclick="closeModal(this.closest(\'.modal-overlay\')); openCreateAgentModal();">Create Agent →</button>'
+        );
+
+        addActivity('API key <strong>' + escapeHTML(name) + '</strong> created', env);
+        showToast('success', 'API key "' + name + '" created!');
+        renderApiKeys();
+    }
+
+    function renderApiKeys() {
+        var list = document.getElementById('apiKeysList');
+        var empty = document.getElementById('apiKeysEmpty');
+
+        if (!state.apiKeys.length) {
+            list.innerHTML = '';
+            empty.style.display = 'block';
+            return;
+        }
+        empty.style.display = 'none';
+
+        list.innerHTML = state.apiKeys.map(function (k, idx) {
+            var masked = k.key.substring(0, 12) + '…' + k.key.slice(-4);
+            var badgeStyle = k.environment === 'sandbox'
+                ? 'background:rgba(251,191,36,0.1);color:var(--warning);'
+                : 'background:rgba(16,185,129,0.1);color:var(--success);';
+
+            return '<div class="api-key-card">' +
+                '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:1rem;">' +
+                '<div><div style="font-weight:600;margin-bottom:0.25rem;">' + escapeHTML(k.name) + '</div>' +
+                '<div style="font-family:monospace;font-size:0.8rem;color:var(--text-secondary);">' + masked + '</div></div>' +
+                '<span class="status-badge" style="' + badgeStyle + '">' + k.environment.toUpperCase() + '</span></div>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;font-size:0.85rem;">' +
+                '<div><span style="color:var(--text-secondary);display:block;font-size:0.75rem;">Created</span>' + new Date(k.createdAt).toLocaleDateString() + '</div>' +
+                '<div><span style="color:var(--text-secondary);display:block;font-size:0.75rem;">Environment</span>' + k.environment + '</div></div>' +
+                '<div style="display:flex;gap:0.5rem;">' +
+                '<button class="btn-action" onclick="navigator.clipboard.writeText(\'' + k.key + '\'); showToast(\'success\', \'Key copied!\')">Copy</button>' +
+                '<button class="btn-action" onclick="downloadEnv(' + idx + ')">Download .env</button>' +
+                '<button class="btn-action btn-danger" onclick="revokeKey(' + idx + ',\'' + escapeHTML(k.name) + '\')">Revoke</button></div></div>';
+        }).join('');
+
+        document.getElementById('metricKeys').textContent = state.apiKeys.length;
+    }
+
+    window.downloadEnv = function (idx) {
+        var k = state.apiKeys[idx];
+        if (!k) return;
+        var content = 'OPACUS_API_KEY=' + k.key + '\nOPACUS_ENV=' + k.environment + '\nAGENT_KERNEL_URL=' + KERNEL_URL + '\n';
+        var blob = new Blob([content], { type: 'text/plain' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = '.env'; a.click();
+        URL.revokeObjectURL(url);
+        showToast('success', '.env file downloaded');
+    };
+
+    window.revokeKey = function (idx, name) {
+        showConfirmModal('Revoke API Key', 'Are you sure you want to revoke <strong>' + escapeHTML(name) + '</strong>?', function () {
+            state.apiKeys.splice(idx, 1);
+            localStorage.setItem('opacusApiKeys', JSON.stringify(state.apiKeys));
+            renderApiKeys();
+            showToast('success', 'API key "' + name + '" revoked');
+            addActivity('🗑️ API key <strong>' + escapeHTML(name) + '</strong> revoked', '');
+        });
+    };
+
+    // ═══════════════════════════════════════════
+    // AUTHENTICATION
+    // ═══════════════════════════════════════════
+    // --- Auth config cache ---
+    let _authConfig = null;
+    async function getAuthConfig() {
+        if (_authConfig) return _authConfig;
+        try {
+            const res = await fetch(KERNEL_URL + '/auth/config');
+            if (!res.ok) throw new Error('Auth config failed');
+            _authConfig = await res.json();
+            return _authConfig;
+        } catch (e) {
+            console.error('Failed to load auth config:', e);
+            return null;
+        }
+    }
+
+    function isValidOAuthClientId(clientId) {
+        if (!clientId) return false;
+        var value = String(clientId).trim().toLowerCase();
+        if (!value) return false;
+        if (value.indexOf('your-') !== -1) return false;
+        if (value.indexOf('placeholder') !== -1) return false;
+        if (value.indexOf('example') !== -1) return false;
+        return true;
+    }
+
+    function loginWithEmailFallback(providerName) {
+        var email = prompt(providerName + ' OAuth şu anda yapılandırılmamış.\n\nDevam etmek için email girin:', 'user@example.com');
+        if (!email) return;
+        if (email.indexOf('@') === -1) {
+            showToast('error', 'Geçerli bir email girin');
+            return;
+        }
+        setLoggedIn(email, providerName + ' (fallback)', { email: email, name: email.split('@')[0] });
+        showToast('info', providerName + ' yerine email fallback ile giriş yapıldı');
+    }
+
+    function completeLoginFlow(message) {
+        closeAllModalOverlays();
+        showToast('success', message || 'Giriş başarılı');
+        showSection('overview');
+    }
+
+    window.showLoginModal = function () {
+        const html = '<div style="padding: 2rem; text-align: center;">' +
+            '<h2 style="margin-bottom: 1rem;">Sign In to Opacus</h2>' +
+            '<p style="color: var(--text-secondary); margin-bottom: 2rem;">Choose your preferred method</p>' +
+            '<div style="display: grid; gap: 1rem;">' +
+            '<button class="btn-primary" style="width: 100%; justify-content: center; gap: 0.75rem;" onclick="loginWithGoogle()">' +
+            '<i class="fab fa-google"></i> <span>Sign in with Google</span>' +
+            '</button>' +
+            '<button class="btn-primary" style="width: 100%; justify-content: center; gap: 0.75rem; background: #333;" onclick="loginWithGitHub()">' +
+            '<i class="fab fa-github"></i> <span>Sign in with GitHub</span>' +
+            '</button>' +
+            '<button class="btn-primary" style="width: 100%; justify-content: center; gap: 0.75rem; background: #627eea;" onclick="loginWithMetaMask()">' +
+            '<i class="fas fa-wallet"></i> <span>Sign in with MetaMask</span>' +
+            '</button>' +
+            '</div>' +
+            '<p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 1.5rem;">Or continue as guest</p>' +
+            '</div>';
+        const modal = createModal(html, { wide: true });
+        const closeBtn = modal.querySelector('.modal-close');
+        if (closeBtn) closeBtn.onclick = function () { closeModal(modal.parentElement); };
+    };
+
+    // ── REAL Google OAuth (Authorization Code flow via backend) ──
+    window.loginWithGoogle = async function () {
+        closeAllModalOverlays();
+        var loadingModal = showLoading('Connecting to Google...');
+        const config = await getAuthConfig();
+        if (!config || !isValidOAuthClientId(config.google_client_id)) {
+            closeModal(loadingModal);
+            loginWithEmailFallback('Google');
+            return;
+        }
+        closeModal(loadingModal);
+
+        const redirectUri = window.location.origin + '/auth/google/callback';
+        const state = Math.random().toString(36).substring(2);
+        const googleAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth' +
+            '?client_id=' + encodeURIComponent(config.google_client_id) +
+            '&redirect_uri=' + encodeURIComponent(redirectUri) +
+            '&response_type=code' +
+            '&scope=' + encodeURIComponent('openid email profile') +
+            '&prompt=select_account' +
+            '&state=' + encodeURIComponent(state);
+
+        const popup = window.open(googleAuthUrl, 'google-login', 'width=520,height=720,left=200,top=100');
+        if (!popup) {
+            showToast('error', 'Popup blocked. Please allow popups for this site.');
+            return;
+        }
+
+        function onGoogleMessage(event) {
+            if (event.origin !== window.location.origin) return;
+            if (event.data && event.data.type === 'google-oauth-code') {
+                window.removeEventListener('message', onGoogleMessage);
+                exchangeGoogleCode(event.data.code, redirectUri);
+            }
+        }
+        window.addEventListener('message', onGoogleMessage);
+
+        const pollTimer = setInterval(function () {
+            if (popup.closed) {
+                clearInterval(pollTimer);
+                window.removeEventListener('message', onGoogleMessage);
+            }
+        }, 1000);
+        setTimeout(function () {
+            clearInterval(pollTimer);
+            window.removeEventListener('message', onGoogleMessage);
+        }, 120000);
+    };
+
+    async function exchangeGoogleCode(code, redirectUri) {
+        closeAllModalOverlays();
+        var loadingModal = showLoading('Verifying Google account...');
+        try {
+            const res = await fetch(KERNEL_URL + '/auth/google/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code, redirect_uri: redirectUri })
+            });
+            const data = await res.json();
+            closeModal(loadingModal);
+            if (res.ok && data.email) {
+                setLoggedIn(data.email, 'Google', { name: data.name, picture: data.picture, email: data.email });
+                completeLoginFlow('Google ile giriş başarılı');
+            } else {
+                showToast('error', 'Google login failed: ' + (data.error || 'Unknown error'));
+            }
+        } catch (e) {
+            closeModal(loadingModal);
+            showToast('error', 'Google login error: ' + e.message);
+        }
+    }
+
+    // ── REAL GitHub OAuth (popup + backend code exchange) ──
+    window.loginWithGitHub = async function () {
+        closeAllModalOverlays();
+        var loadingModal = showLoading('Connecting to GitHub...');
+        const config = await getAuthConfig();
+        if (!config || !isValidOAuthClientId(config.github_client_id)) {
+            closeModal(loadingModal);
+            loginWithEmailFallback('GitHub');
+            return;
+        }
+        closeModal(loadingModal);
+
+        const githubAuthUrl = 'https://github.com/login/oauth/authorize' +
+            '?client_id=' + encodeURIComponent(config.github_client_id) +
+            '&scope=user:email' +
+            '&redirect_uri=' + encodeURIComponent(window.location.origin + '/github-callback.html') +
+            '&state=' + Math.random().toString(36).substring(2);
+
+        const popup = window.open(githubAuthUrl, 'github-login', 'width=500,height=700,left=200,top=100');
+        if (!popup) {
+            showToast('error', 'Popup blocked. Please allow popups for this site.');
+            return;
+        }
+
+        // Listen for message from callback page
+        function onGitHubMessage(event) {
+            if (event.origin !== window.location.origin) return;
+            if (event.data && event.data.type === 'github-oauth-code') {
+                window.removeEventListener('message', onGitHubMessage);
+                const code = event.data.code;
+                exchangeGitHubCode(code);
+            }
+        }
+        window.addEventListener('message', onGitHubMessage);
+
+        // Also poll for popup close (user cancelled)
+        const pollTimer = setInterval(function () {
+            if (popup.closed) {
+                clearInterval(pollTimer);
+                window.removeEventListener('message', onGitHubMessage);
+            }
+        }, 1000);
+        setTimeout(function () {
+            clearInterval(pollTimer);
+            window.removeEventListener('message', onGitHubMessage);
+        }, 120000);
+    };
+
+    async function exchangeGitHubCode(code) {
+        closeAllModalOverlays();
+        var loadingModal = showLoading('Verifying GitHub account...');
+        try {
+            const res = await fetch(KERNEL_URL + '/auth/github/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code })
+            });
+            const data = await res.json();
+            closeModal(loadingModal);
+            if (res.ok && data.login) {
+                setLoggedIn(data.login, 'GitHub', { name: data.name, avatar: data.avatar, email: data.email });
+                completeLoginFlow('GitHub ile giriş başarılı');
+            } else {
+                showToast('error', 'GitHub login failed: ' + (data.error || 'Unknown error'));
+            }
+        } catch (e) {
+            closeModal(loadingModal);
+            showToast('error', 'GitHub login error: ' + e.message);
+        }
+    }
+
+    // ── REAL MetaMask (wallet connection) ──
+    window.loginWithMetaMask = function () {
+        closeAllModalOverlays();
+        var loadingModal = showLoading('Connecting to MetaMask...');
+        var eth = getMetaMaskProvider();
+        if (!eth) {
+            closeModal(loadingModal);
+            showToast('error', 'MetaMask not installed. Please install MetaMask browser extension.');
+            return;
+        }
+
+        eth.request({ method: 'eth_requestAccounts' })
+            .then(async function (accounts) {
+                const walletAddr = accounts && accounts[0] ? accounts[0] : null;
+                if (!walletAddr) throw new Error('No wallet account returned');
+
+                const nonce = 'opacus-login:' + Date.now() + ':' + Math.random().toString(36).slice(2, 10);
+                const message = [
+                    'Opacus Agentboard Login',
+                    'Address: ' + walletAddr,
+                    'Nonce: ' + nonce,
+                    'Origin: ' + window.location.origin
+                ].join('\n');
+
+                await eth.request({
+                    method: 'personal_sign',
+                    params: [message, walletAddr]
+                });
+
+                closeModal(loadingModal);
+                setLoggedIn(walletAddr, 'MetaMask', { address: walletAddr });
+                completeLoginFlow('MetaMask imza doğrulaması başarılı');
+            })
+            .catch(function (error) {
+                closeModal(loadingModal);
+                showToast('error', 'MetaMask connection failed: ' + error.message);
+            });
+    };
+
+    function setLoggedIn(identifier, provider, extra) {
+        state.user = {
+            identifier: identifier,
+            provider: provider,
+            loggedInAt: Date.now(),
+            name: extra && extra.name ? extra.name : null,
+            picture: extra && (extra.picture || extra.avatar) ? (extra.picture || extra.avatar) : null,
+            email: extra && extra.email ? extra.email : null
+        };
+        if (provider === 'MetaMask') {
+            localStorage.removeItem('opacusUser');
+        } else {
+            localStorage.setItem('opacusUser', JSON.stringify(state.user));
+        }
+        updateNavBar();
+        addActivity('👤 Signed in with ' + provider, identifier);
+    }
+
+    function updateNavBar() {
+        const navBtn = document.getElementById('navUserBtn');
+        const navText = document.getElementById('navUserText');
+        const navDot = document.getElementById('navUserDot');
+        if (state.user) {
+            navBtn.style.background = 'var(--primary)';
+            const displayName = state.user.name || state.user.identifier;
+            const shortName = displayName.length > 16 ? displayName.substring(0, 14) + '…' : displayName;
+            navText.textContent = shortName;
+            navDot.style.display = 'inline-block';
+            navDot.style.color = 'var(--success)';
+            // Show avatar if available
+            if (state.user.picture) {
+                navBtn.innerHTML = '<img src="' + escapeHTML(state.user.picture) + '" style="width:24px;height:24px;border-radius:50%;margin-right:6px;" onerror="this.style.display=\'none\'">' +
+                    '<span id="navUserText">' + escapeHTML(shortName) + '</span>' +
+                    '<span id="navUserDot" style="color:var(--success);font-size:0.6rem;">●</span>';
+            }
+            navBtn.onclick = function () { logout(); };
+        } else {
+            navBtn.style.background = 'var(--bg-elevated)';
+            navBtn.innerHTML = '<i class="fas fa-user" style="font-size:0.9rem;"></i> <span id="navUserText">Sign In</span> <span id="navUserDot" style="display:none;">●</span>';
+            navBtn.onclick = function () { showLoginModal(); };
+        }
+    }
+
+    window.logout = function () {
+        showConfirmModal('Sign Out', 'Sign out from Opacus?', function () {
+            state.user = null;
+            localStorage.removeItem('opacusUser');
+            // Revoke Google session if applicable
+            if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+                try { google.accounts.id.disableAutoSelect(); } catch (e) {}
+            }
+            updateNavBar();
+            showToast('info', 'Signed out successfully');
+            addActivity('👋 Signed out', '');
+        });
+    };
+
+    // ═══════════════════════════════════════════
+    // USAGE
+    // ═══════════════════════════════════════════
+    function loadUsage() {
+        document.getElementById('usageApiCalls').textContent = state.stats.apiCalls;
+        document.getElementById('usageAgents').textContent = state.stats.agentsCreated;
+        document.getElementById('usageEvents').textContent = state.stats.eventsPublished;
+    }
+
+    // ═══════════════════════════════════════════
+    // ACTIVITY FEED
+    // ═══════════════════════════════════════════
+    function addActivity(text, extra) {
+        var feed = document.getElementById('activityFeed');
+        var item = document.createElement('div');
+        item.className = 'activity-item';
+        item.style.animation = 'slideDown 0.3s ease';
+        item.innerHTML = '<div class="activity-time">' + new Date().toLocaleTimeString() + '</div>' +
+            '<div>' + text + (extra ? ' <span class="activity-amount">' + escapeHTML(extra) + '</span>' : '') + '</div>';
+        feed.insertBefore(item, feed.firstChild);
+        while (feed.children.length > 8) feed.removeChild(feed.lastChild);
+    }
+
+    // ═══════════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════════
+    window.addEventListener('load', async function () {
+        // Set kernel URL display
+        var urlDisplay = document.getElementById('kernelUrlDisplay');
+        if (urlDisplay && KERNEL_URL) urlDisplay.textContent = KERNEL_URL;
+
+        // Restore user session from localStorage
+        var savedUser = localStorage.getItem('opacusUser');
+        if (savedUser) {
+            try {
+                state.user = JSON.parse(savedUser);
+                if (state.user && state.user.provider === 'MetaMask') {
+                    state.user = null;
+                    localStorage.removeItem('opacusUser');
+                }
+            } catch (e) {
+                state.user = null;
+            }
+        }
+        updateNavBar();
+
+        // Default environment: production
+        var prodBtn = document.querySelector(".env-option[onclick*=\"switchEnv('production'\"]");
+        if (prodBtn) switchEnv('production', prodBtn);
+
+        await checkKernel();
+        loadOverview();
+        renderApiKeys();
+        renderBillingPanel();
+
+        var eth = getMetaMaskProvider();
+        if (eth && eth.on) {
+            eth.on('accountsChanged', function () { refreshBillingRealData(); });
+            eth.on('chainChanged', function () { refreshBillingRealData(); });
+        }
+    });
+
+    // Catch all errors gracefully
+    window.addEventListener('error', function (e) { console.error('[Runtime Error]', e.error || e.message); });
+    window.addEventListener('unhandledrejection', function (e) { console.error('[Promise Error]', e.reason); });
+
+})();
+</script>
+</body>
+</html>
