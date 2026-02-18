@@ -5,7 +5,6 @@ Production dashboard for creating, managing, and operating autonomous agents on 
 ## Live Links
 
 - App: https://opacus.xyz/agentboard.html
-- Current API tunnel: https://6995-78-186-104-224.ngrok-free.app
 
 ## Repository Structure
 
