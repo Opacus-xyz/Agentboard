@@ -1,5 +1,7 @@
 # Agentboard Quickstart
 
+Related guide: [OpenClaw Operations](./OPENCLAW-OPERATIONS.md)
+
 ## 1) User quick test (no code)
 
 1. Open: `https://opacus.xyz/agentboard.html`
@@ -46,7 +48,16 @@ Open:
 
 - `http://localhost:8080/agentboard.html`
 
-## 4) Common fixes
+## 4) OpenClaw quick validation
+
+1. Open Settings in Agentboard
+2. Set OpenClaw agent (`main` by default)
+3. Add Anthropic API key (optional, session mode)
+4. Click **Test OpenClaw**
+5. Run Task / Discovery / Reputation flow
+6. Verify output in Live Result panel
+
+## 5) Common fixes
 
 - OAuth errors: check `/auth/config` and provider console redirect URIs
 - MetaMask: ensure wallet popup is allowed and correct network selected

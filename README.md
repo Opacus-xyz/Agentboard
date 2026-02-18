@@ -1,123 +1,154 @@
 # Opacus Agentboard
 
-Production dashboard for creating, managing, and operating autonomous agents on Opacus.
+Professional operations dashboard for running autonomous agents on Opacus.
 
-## Live Links
+[![Live App](https://img.shields.io/badge/Live-opacus.xyz%2Fagentboard-6366f1)](https://opacus.xyz/agentboard.html)
+[![OpenClaw Docs](https://img.shields.io/badge/OpenClaw-Operational%20Guide-06b6d4)](./OPENCLAW-OPERATIONS.md)
+[![Quickstart](https://img.shields.io/badge/Docs-Quickstart-22c55e)](./QUICKSTART.md)
 
-- App: https://opacus.xyz/agentboard.html
+---
 
-## Repository Structure
+## Overview
 
-- agentboard.html — Single-file production dashboard UI
-- QUICKSTART.md — Fast setup and first-run checks
-- ROADMAP.md — Planned milestones and delivery status
-- CHANGELOG.md — Release history and notable updates
-- CONTRIBUTING.md — Collaboration and PR expectations
+Agentboard is the production-facing control plane for:
 
-## Product Scope
+- Authentication and session management
+- Agent lifecycle operations
+- Payment and billing visibility
+- OpenClaw-powered task execution workflows
+
+The UI is optimized for operational reliability, rapid onboarding, and transparent runtime status.
+
+## Key Capabilities
 
 ### Authentication
 
-- Google OAuth code exchange flow
-- GitHub OAuth code exchange flow
-- MetaMask login with mandatory personal_sign signature
-- Automatic fallback flow when OAuth providers are not configured
+- Google OAuth code exchange
+- GitHub OAuth code exchange
+- MetaMask login with mandatory `personal_sign`
+- Safe fallback behavior when OAuth providers are not configured
 
 ### Agent Operations
 
-- Create agents
-- List and inspect runtime status
-- Delete agents
-- Observe platform and activity metrics
+- Create, list, inspect, and delete agents
+- Runtime status visibility
+- Activity and metrics panels
 
 ### Payments and Billing
 
-- Wallet connection and network checks
+- Wallet connection and chain checks
 - On-chain USDC balance visibility
-- Payment lock/release helper flows
-- Settlement-oriented billing table
+- Escrow lock/release helpers
+- Settlement-aware billing panels
 
-### Developer Experience
+### OpenClaw Runtime
 
-- API key generation and local persistence
-- Environment switching and diagnostics
-- Operational status and health indicators
+- Task execution flow with budget/reputation constraints
+- Discovery explorer for capability-based matching
+- Reputation lookup by DID
+- User-owned Anthropic API key support
+
+See the complete guide: [OPENCLAW-OPERATIONS.md](./OPENCLAW-OPERATIONS.md)
+
+## Architecture at a Glance
+
+```text
+Agentboard (UI)
+	├─ Auth + Agent Ops + Billing + OpenClaw panels
+	└─ API calls
+				↓
+Agent Kernel
+	├─ /health
+	├─ /auth/*
+	├─ /api/agents/*
+	└─ /api/openclaw/*
+				↓
+OpenClaw Runtime + Opacus services
+```
 
 ## API Dependencies
 
-Agentboard expects these backend endpoints:
+Required backend endpoints:
 
-- GET /health
-- GET /auth/config
-- POST /auth/google/token
-- POST /auth/github/token
-- POST /api/agents
-- GET /api/agents
-- GET /api/agents/:sessionId
-- DELETE /api/agents/:sessionId
+- `GET /health`
+- `GET /auth/config`
+- `POST /auth/google/token`
+- `POST /auth/github/token`
+- `POST /api/agents`
+- `GET /api/agents`
+- `GET /api/agents/:sessionId`
+- `DELETE /api/agents/:sessionId`
+- `GET /api/openclaw/health`
+- `POST /api/openclaw/request`
 
-## Required Backend Environment
+## Environment Requirements
 
-- GOOGLE_OAUTH_CLIENT_ID
-- GOOGLE_OAUTH_CLIENT_SECRET
-- GITHUB_OAUTH_CLIENT_ID
-- GITHUB_OAUTH_CLIENT_SECRET
-- FRONTEND_URL
+- `GOOGLE_OAUTH_CLIENT_ID`
+- `GOOGLE_OAUTH_CLIENT_SECRET`
+- `GITHUB_OAUTH_CLIENT_ID`
+- `GITHUB_OAUTH_CLIENT_SECRET`
+- `FRONTEND_URL`
 
-## Local Run
+## Local Development
 
-1) Start backend
+1. Start backend
 
-- cd agent-kernel
-- npm install
-- npm run build
-- node dist/api-server.js
+```bash
+cd agent-kernel
+npm install
+npm run build
+node dist/api-server.js
+```
 
-2) Start static frontend
+2. Start static frontend
 
-- cd website
-- npx serve . -l 8080
+```bash
+cd website
+npx serve . -l 8080
+```
 
-3) Open
+3. Open
 
-- http://localhost:8080/agentboard.html
+- `http://localhost:8080/agentboard.html`
 
-## Deployment Notes
+## Production Notes
 
-- Frontend is deployed on Vercel (opacus.xyz)
-- Current backend exposure is ngrok-based
-- Stable production should use fixed domain API hosting
+- Frontend deploys on Vercel (`opacus.xyz`)
+- Stable backend hosting should use a fixed production domain
+- Avoid long-term operational dependence on temporary tunnels
 
-## Security Notes
+## Security Guidelines
 
-- Never commit private keys, OAuth secrets, or wallet seed material
-- Keep mainnet env files machine-local and excluded from source control
-- Browser signatures are user-side approvals and are not server-automatable
+- Never commit private keys, OAuth secrets, or seed phrases
+- Keep environment secrets out of source control
+- Treat browser signatures as user-side approvals only
+- Rotate API and OAuth credentials regularly
 
 ## Troubleshooting
 
-### OAuth invalid_client
+### OAuth `invalid_client`
 
-- Confirm provider app client id/secret
-- Confirm redirect URI and origin registration
-- Confirm /auth/config returns non-empty provider ids
+- Validate provider client id/secret
+- Validate redirect URI and allowed origin
+- Confirm `/auth/config` returns provider identifiers
 
 ### Login stuck on loading
 
-- Fixed in current implementation via deterministic modal cleanup
-- Hard refresh if stale browser cache is suspected
+- Verify backend health and auth config endpoints
+- Hard refresh (`Cmd+Shift+R`) to clear stale frontend state
 
-### Payment lock issues
+### Payment lock/release failures
 
-- Usually contract/chain mismatch
-- Verify escrow address matches active chain deployment
+- Check chain and contract alignment
+- Verify escrow addresses for active network
 
-## Progress Visibility
+## Project Documentation
 
-Project progress is maintained in:
-
-- ROADMAP.md
-- CHANGELOG.md
+- [QUICKSTART.md](./QUICKSTART.md)
+- [OPENCLAW-OPERATIONS.md](./OPENCLAW-OPERATIONS.md)
+- [ROADMAP.md](./ROADMAP.md)
+- [CHANGELOG.md](./CHANGELOG.md)
+- [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 ## License
 
