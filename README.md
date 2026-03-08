@@ -1,155 +1,343 @@
-# Opacus Agentboard
 
-Professional operations dashboard for running autonomous agents on Opacus.
+						     Opacus Agent Orchestration Platform
 
-[![Live App](https://img.shields.io/badge/Live-opacus.xyz%2Fagentboard-6366f1)](https://opacus.xyz/agentboard.html)
-[![OpenClaw Docs](https://img.shields.io/badge/OpenClaw-Operational%20Guide-06b6d4)](./OPENCLAW-OPERATIONS.md)
-[![Quickstart](https://img.shields.io/badge/Docs-Quickstart-22c55e)](./QUICKSTART.md)
+Opacus is an AI agent orchestration layer designed to transform user intents into structured tasks executed by autonomous agents.
 
----
+The platform enables users to run AI-powered agents that perform complex tasks such as:
 
-## Overview
+market intelligence analysis
 
-Agentboard is the production-facing control plane for:
+risk evaluation
 
-- Authentication and session management
-- Agent lifecycle operations
-- Payment and billing visibility
-- OpenClaw-powered task execution workflows
+research workflows
 
-The UI is optimized for operational reliability, rapid onboarding, and transparent runtime status.
+multi-step decision making
 
-## Key Capabilities
+Opacus acts as the execution intelligence layer between user intent and agent compute networks.
 
-### Authentication
+Core Concept
 
-- Google OAuth code exchange
-- GitHub OAuth code exchange
-- MetaMask login with mandatory `personal_sign`
-- Safe fallback behavior when OAuth providers are not configured
+Traditional AI systems operate like this:
 
-### Agent Operations
+Prompt → Response
 
-- Create, list, inspect, and delete agents
-- Runtime status visibility
-- Activity and metrics panels
+Opacus operates differently:
 
-### Payments and Billing
+Intent
+↓
+Task Creation
+↓
+Agent Selection
+↓
+Execution Plan
+↓
+Step Execution
+↓
+Validation
+↓
+Result
 
-- Wallet connection and chain checks
-- On-chain USDC balance visibility
-- Escrow lock/release helpers
-- Settlement-aware billing panels
+This architecture enables autonomous task execution rather than simple text responses.
 
-### OpenClaw Runtime
+Architecture Overview
+User
+ ↓
+Intent Parser
+ ↓
+Task Manager
+ ↓
+Agent Router
+ ↓
+Agent Marketplace (0G)
+ ↓
+Agent Execution (0G Compute)
+ ↓
+Validator
+ ↓
+Result Engine
+ ↓
+Agent Monitor
 
-- Task execution flow with budget/reputation constraints
-- Discovery explorer for capability-based matching
-- Reputation lookup by DID
-- User-owned Anthropic API key support
+Opacus handles:
 
-See the complete guide: [OPENCLAW-OPERATIONS.md](./OPENCLAW-OPERATIONS.md)
+intent parsing
 
-## Architecture at a Glance
+task orchestration
 
-```text
-Agentboard (UI)
-	├─ Auth + Agent Ops + Billing + OpenClaw panels
-	└─ API calls
-				↓
-Agent Kernel
-	├─ /health
-	├─ /auth/*
-	├─ /api/agents/*
-	└─ /api/openclaw/*
-				↓
-OpenClaw Runtime + Opacus services
-```
+execution tracking
 
-## API Dependencies
+validation
 
-Required backend endpoints:
+user interface
 
-- `GET /health`
-- `GET /auth/config`
-- `POST /auth/google/token`
-- `POST /auth/github/token`
-- `POST /api/agents`
-- `GET /api/agents`
-- `GET /api/agents/:sessionId`
-- `DELETE /api/agents/:sessionId`
-- `GET /api/openclaw/health`
-- `POST /api/openclaw/request`
+Agent discovery and compute are provided by the 0G ecosystem.
 
-## Environment Requirements
+Integration with 0G
 
-- `GOOGLE_OAUTH_CLIENT_ID`
-- `GOOGLE_OAUTH_CLIENT_SECRET`
-- `GITHUB_OAUTH_CLIENT_ID`
-- `GITHUB_OAUTH_CLIENT_SECRET`
-- `FRONTEND_URL`
+Opacus integrates with the AI infrastructure built by
+0G Labs.
 
-## Local Development
+This allows the platform to:
 
-1. Start backend
+discover agents from the 0G marketplace
 
-```bash
-cd agent-kernel
-npm install
-npm run build
-node dist/api-server.js
-```
+run agents on decentralized compute
 
-2. Start static frontend
+scale execution without hosting agents internally
 
-```bash
-cd website
-npx serve . -l 8080
-```
+Responsibilities are divided as follows:
 
-3. Open
+0G Infrastructure
 
-- `http://localhost:8080/agentboard.html`
+agent marketplace
 
-## Production Notes
+AI compute network
 
-- Frontend deploys on Vercel (`opacus.xyz`)
-- Stable backend hosting should use a fixed production domain
-- Avoid long-term operational dependence on temporary tunnels
+model hosting
 
-## Security Guidelines
+agent discovery
 
-- Never commit private keys, OAuth secrets, or seed phrases
-- Keep environment secrets out of source control
-- Treat browser signatures as user-side approvals only
-- Rotate API and OAuth credentials regularly
+Opacus Platform
 
-## Troubleshooting
+intent interpretation
 
-### OAuth `invalid_client`
+task orchestration
 
-- Validate provider client id/secret
-- Validate redirect URI and allowed origin
-- Confirm `/auth/config` returns provider identifiers
+execution monitoring
 
-### Login stuck on loading
+validation
 
-- Verify backend health and auth config endpoints
-- Hard refresh (`Cmd+Shift+R`) to clear stale frontend state
+user interface
 
-### Payment lock/release failures
+Platform Components
+Intent Parser
 
-- Check chain and contract alignment
-- Verify escrow addresses for active network
+Transforms user prompts into structured intents.
 
-## Project Documentation
+Example:
 
-- [QUICKSTART.md](./QUICKSTART.md)
-- [OPENCLAW-OPERATIONS.md](./OPENCLAW-OPERATIONS.md)
-- [ROADMAP.md](./ROADMAP.md)
-- [CHANGELOG.md](./CHANGELOG.md)
-- [CONTRIBUTING.md](./CONTRIBUTING.md)
+User Prompt:
+Evaluate candidate agent risks and provide a go/no-go recommendation.
 
-## License
+Parsed intent:
 
-Internal Opacus project distribution unless otherwise specified.
+task_type: risk_evaluation
+domain: agent_analysis
+depth: standard
+Task Manager
+
+Creates and manages tasks.
+
+Task lifecycle:
+
+CREATED
+PLANNING
+RUNNING
+VALIDATING
+COMPLETED
+FAILED
+
+Each task contains:
+
+task_id
+task_type
+agent_requirements
+execution_plan
+status
+Agent Router
+
+Selects the most appropriate agent from the marketplace.
+
+Selection criteria:
+
+capabilities
+reputation
+latency
+cost
+success_rate
+
+Agents are fetched from the 0G marketplace.
+
+Execution Engine
+
+Executes the generated task plan step-by-step.
+
+Example execution plan:
+
+Step 1
+Collect candidate agent data
+
+Step 2
+Analyze operational risks
+
+Step 3
+Evaluate security concerns
+
+Step 4
+Generate recommendation
+
+Each step produces logs and intermediate results.
+
+Validator
+
+Validates the final result before returning it to the user.
+
+Validation checks include:
+
+data consistency
+confidence score
+execution integrity
+
+If confidence is too low, the system may re-run or refine analysis.
+
+Agent Monitor
+
+The platform includes a visual agent monitoring system.
+
+Instead of showing only logs, agents are visualized inside a 2D pixel-style house interface.
+
+Each room represents a task stage.
+
+Planning Room
+Research Room
+Execution Room
+Validation Room
+
+Agents move between rooms as they progress through execution.
+
+This gives users a real-time visual representation of agent activity.
+
+Frontend Workflow
+
+User interaction follows this flow:
+
+1. User Login
+
+User signs in using email authentication.
+
+Dashboard shows:
+
+Recent Tasks
+Running Agents
+Completed Results
+2. Run Agent
+
+User opens the Run Agent interface and submits a task.
+
+Example task:
+
+Evaluate candidate agent risks and provide a go/no-go recommendation with reasons.
+3. Agent Assignment
+
+The platform queries the 0G marketplace and selects the most suitable agent.
+
+Displayed to the user:
+
+Agent ID
+Reputation Score
+Latency
+Capability
+4. Execution Monitoring
+
+The Agent Monitor shows real-time execution:
+
+Execution Plan
+Current Step
+Logs
+Progress
+
+Agents visually move between rooms in the monitor.
+
+5. Result Generation
+
+After validation, the user receives a structured result.
+
+Example output:
+
+Recommendation: GO
+
+Operational Risk: Low
+Security Risk: Medium
+Dependency Risk: Low
+
+Reason:
+The candidate agent demonstrates stable execution history and low operational failure rate.
+
+Confidence Score: 87%
+Example Use Cases
+
+The platform can support various agent-driven tasks.
+
+Examples:
+
+Risk Evaluation
+Evaluate candidate agent risks and provide recommendation.
+Market Intelligence
+Analyze renewable energy startup trends.
+Research Automation
+Collect and summarize market insights.
+Strategy Analysis
+Evaluate DeFi yield opportunities.
+Technology Stack
+
+Frontend:
+
+React
+Next.js
+TailwindCSS
+Framer Motion
+
+Backend:
+
+Node.js
+TypeScript
+REST APIs
+Task Orchestration Engine
+
+Infrastructure:
+
+0G Agent Marketplace
+0G Compute Network
+Project Structure
+
+Example repository layout:
+
+/frontend
+/components
+/pages
+/hooks
+
+/backend
+/services
+/orchestration
+/agents
+
+/docs
+architecture
+api
+
+/monitor
+agent-monitor-ui
+Future Development
+
+Planned improvements include:
+
+multi-agent orchestration
+
+advanced monitoring interface
+
+agent reputation system
+
+task memory and knowledge graph
+
+deeper integration with decentralized AI infrastructure
+
+Vision
+
+Opacus aims to become an execution layer for AI agents, enabling autonomous systems to safely perform real-world tasks through structured orchestration.
+
+Instead of simple AI chat interfaces, the platform focuses on intent-driven execution and verifiable outcomes.
+
+License
+
+MIT License
