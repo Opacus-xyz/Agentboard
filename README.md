@@ -5,7 +5,7 @@
 **The Control Plane for Autonomous AI Agents**
 
 [![Live App](https://img.shields.io/badge/Live-opacus.xyz%2Fagentboard-6366f1?style=for-the-badge&logo=vercel)](https://opacus.xyz/agentboard)
-[![SDK](https://img.shields.io/badge/npm-opacus--agent--sdk@1.0.1-cb3837?style=for-the-badge&logo=npm)](https://www.npmjs.com/package/opacus-agent-sdk)
+[![SDK](https://img.shields.io/badge/npm-opacus--agent--sdk@1.1.0-cb3837?style=for-the-badge&logo=npm)](https://www.npmjs.com/package/opacus-agent-sdk)
 [![MCP](https://img.shields.io/badge/MCP-OpenClaw-06b6d4?style=for-the-badge)](./OPENCLAW-OPERATIONS.md)
 [![Quickstart](https://img.shields.io/badge/Quickstart-5min-22c55e?style=for-the-badge)](./QUICKSTART.md)
 
@@ -123,6 +123,74 @@ console.log('Valid:', verified.valid); // true
 await opacus.escrow.release(lock.escrowId, 'release');
 console.log('Released, 1% fee collected automatically');
 ```
+
+### Data Market — IoT & Real-World Data on 0G DA
+
+```ts
+// Browse IoT energy feeds in Istanbul
+const { listings } = await opacus.dataMarket.list({
+  category: 'iot-energy',
+  location: 'istanbul',
+});
+
+// Purchase — instant delivery for 0G DA listings
+const purchase = await opacus.dataMarket.purchase(listings[0].id);
+console.log('Data hash:', purchase.dataHash);
+
+// Publish your own dataset
+const listing = await opacus.dataMarket.publish({
+  title: 'Solar Panel Output — Berlin',
+  category: 'iot-energy',
+  priceUsdc: 2,
+  dataHash: '0xabc...',
+  location: { city: 'Berlin', country: 'DE' },
+  deviceType: 'SolarEdge SE3000',
+  ownerSignature: await wallet.signMessage('0xabc...'),
+});
+```
+
+**IoT categories:** `iot-energy` · `iot-gps` · `iot-weather` · `iot-industrial` · `iot-agriculture` · `iot-transport` · `iot-healthcare`
+
+---
+
+### Nitro — CEX Co-Location + QUIC Routing
+
+```ts
+// Get the Nitro node co-located with Gemini (AWS us-iad-1)
+const route = await opacus.nitro.route({ exchange: 'gemini' });
+console.log('QUIC endpoint:', route.quic_endpoint);
+console.log('Speedup:', route.latency_comparison.speedup_p50);
+
+// Supported exchanges: gemini | binance | coinbase | okx | bybit | kraken | uniswap | aerodrome | 0g
+```
+
+Explore the full Nitro pipeline at [opacus.xyz/nitro](https://opacus.xyz/nitro).
+
+---
+
+### Hermes — AI Agent Task Execution
+
+```ts
+// Full pipeline: IoT signal → Nitro routing → CEX+DEX execution → 0G DA log
+const signal = await opacus.dataMarket.purchase('listing_...');
+
+const task = await opacus.hermes.run({
+  intent: 'Rebalance BTC/USDC based on solar-output signal',
+  chain: 'base',
+  exchange: 'gemini',
+  nitro: true,
+  signal: signal.dataHash,
+  log_to_0g: true,
+});
+console.log('Task ID:', task.taskId);
+console.log('Nitro node:', task.nitroNode);
+
+// Check status later
+const status = await opacus.hermes.status(task.taskId);
+console.log('Status:', status.status); // 'executed'
+```
+
+---
 
 Full API surface: [opacus-agent-sdk on npm](https://www.npmjs.com/package/opacus-agent-sdk)
 
@@ -279,6 +347,13 @@ Agents running in trusted execution environments produce DCAP-style attestation 
 | GET | `/api/v1/billing/fees` | Fee history |
 | GET | `/api/routing/status` | Routing mode and latency |
 | POST | `/api/kinetic/mcp` | MCP tools/list and tools/call |
+| GET | `/api/data-market/listings` | Browse Data Market (IoT + real-world datasets) |
+| POST | `/api/data-market/purchase/:id` | Purchase listing (instant 0G DA delivery) |
+| GET | `/api/data-market/my-purchases` | List your purchased datasets |
+| POST | `/api/data-market/publish` | Publish a new dataset |
+| GET | `/api/nitro/route` | CEX-anchored Nitro node routing |
+| GET | `/api/v1/nitro/ping` | Live Nitro latency ping |
+| POST | `/api/runtime/task-execution` | Hermes AI agent task execution |
 
 ---
 
@@ -297,7 +372,7 @@ Agents running in trusted execution environments produce DCAP-style attestation 
 ## Requirements
 
 - Node.js 18+
-- `opacus-agent-sdk` ≥ 1.0.1 (or `openclaw` for MCP)
+- `opacus-agent-sdk` ≥ 1.1.0 (or `openclaw` for MCP)
 - An Opacus API key — get one at [opacus.xyz/agentboard](https://opacus.xyz/agentboard)
 - USDC on Base or 0G network for escrow operations
 

@@ -139,6 +139,61 @@ console.log(`Score: ${score.score} / 100  (${score.tier})`);
 // Score: 82.25 / 100  (gold)
 ```
 
+### Browse & Purchase Data Market listings
+
+```ts
+// Find IoT energy feeds near Istanbul
+const { listings } = await opacus.dataMarket.list({
+  category: 'iot-energy',
+  location: 'istanbul',
+});
+
+// Purchase — for 0G DA listings, delivery is instant
+const purchase = await opacus.dataMarket.purchase(listings[0].id);
+console.log('Data hash:', purchase.dataHash);
+console.log('Access URL:', purchase.accessUrl);
+
+// View purchase history
+const { purchases } = await opacus.dataMarket.myPurchases();
+```
+
+### Nitro — find the fastest exchange-anchored node
+
+```ts
+// Get Nitro node co-located with Gemini (AWS us-iad-1, ~0.3 ms TCP)
+const route = await opacus.nitro.route({ exchange: 'gemini' });
+console.log('QUIC endpoint:', route.quic_endpoint);
+console.log('QUIC p50 latency:', route.latency_comparison.quic_p50_ms, 'ms');
+
+// Live ping across all nodes
+const ping = await opacus.nitro.ping();
+console.log('Best node:', ping.winner, 'RTT:', ping.rttMs, 'ms');
+```
+
+### Hermes — full AI agent trading pipeline
+
+```ts
+// IoT signal → Nitro → CEX+DEX → 0G DA audit log
+const signal  = await opacus.dataMarket.purchase('listing_...');
+
+const task = await opacus.hermes.run({
+  intent: 'Rebalance ETH/USDC based on solar-output signal',
+  chain: 'base',
+  exchange: 'gemini',   // CEX leg via Nitro
+  nitro: true,          // route through nearest QUIC node
+  signal: signal.dataHash, // 0G DA hash feeds the decision
+  log_to_0g: true,      // audit trail on 0G DA
+});
+console.log('Task:', task.taskId, '|', task.status);
+
+// Poll status
+const status = await opacus.hermes.status(task.taskId);
+console.log('Nitro node used:', status.result?.nitroNode);
+```
+
+**Supported CEX exchanges:** `gemini` · `binance` · `binanceus` · `coinbase` · `kraken` · `okx` · `bybit`  
+**DEX:** `uniswap` · `aerodrome` · `0g`
+
 ---
 
 ## Path 3 — MCP with OpenClaw

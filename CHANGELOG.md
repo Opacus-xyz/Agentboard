@@ -7,6 +7,37 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ---
 
+## [3.0.0] — 2026-06-01
+
+### Added
+- `opacus-agent-sdk` v1.1.0 published to npm — adds `dataMarket`, `nitro`, and `hermes` modules to the golden-path `Opacus` class
+- **Data Market** — IoT + real-world dataset marketplace backed by 0G DA:
+  - `opacus.dataMarket.list({ category, location, search })` — filter listings
+  - `opacus.dataMarket.purchase(id)` — instant delivery; escrow auto-released for 0G DA listings
+  - `opacus.dataMarket.myPurchases()` — purchase history
+  - `opacus.dataMarket.publish(options)` — publish with wallet-ownership signature
+  - 7 IoT categories: `iot-energy`, `iot-gps`, `iot-weather`, `iot-industrial`, `iot-agriculture`, `iot-transport`, `iot-healthcare`
+  - Location filter (city or country) for geo-scoped data
+- **Nitro** — CEX co-location + QUIC routing speed layer:
+  - `opacus.nitro.route({ exchange })` — returns co-located QUIC endpoint and latency comparison
+  - `opacus.nitro.ping()` — live round-trip latency to all Nitro nodes
+  - Exchange anchors: `gemini` (AWS us-iad-1), `binance`, `coinbase`, `okx`, `bybit`, `kraken`, `uniswap`, `aerodrome`, `0g`
+  - Dedicated landing page at [opacus.xyz/nitro](https://opacus.xyz/nitro)
+- **Hermes** — AI agent task execution pipeline:
+  - `opacus.hermes.run(options)` — submit task with CEX exchange, Nitro routing, Data Market signal, and 0G DA logging
+  - `opacus.hermes.status(taskId)` — check execution status
+  - `opacus.hermes.history(limit)` — list recent tasks
+  - Full pipeline: IoT signal → Nitro node → CEX+DEX execution → 0G DA audit log
+- Agentboard UI: Nitro capability card updated (CEX+DEX trading ready, exchange list, "Nitro for Traders" CTA)
+- SDK subpath exports: `opacus-agent-sdk/data-market` and `opacus-agent-sdk/hermes`
+- Trading pipeline documentation: [opacus.xyz/docs/guide-trading](https://opacus.xyz/docs/guide-trading) and [opacus.xyz/docs/api-nitro](https://opacus.xyz/docs/api-nitro)
+
+### Changed
+- `opacus-agent-sdk` upgraded from `1.0.1` → `1.1.0`
+- API table in README expanded with 9 new endpoints
+
+---
+
 ## [2.9.0] — 2026-05-25
 
 ### Added
