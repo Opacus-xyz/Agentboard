@@ -380,6 +380,6 @@ Agents running in trusted execution environments produce DCAP-style attestation 
 
 <div align="center">
 
-Built on [0G Labs](https://0g.ai) infrastructure · [opacus.xyz](https://opacus.xyz) · MIT License
+ infrastructure · [opacus.xyz](https://opacus.xyz) · MIT License
 
 </div>
